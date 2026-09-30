@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>실시간 대전 Match-3 퍼즐 게임</title>
+    <title>실시간 랜덤 대전 Match-3 퍼즐 게임</title>
     <!-- Phaser 3 게임 엔진 -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.0/dist/phaser.min.js"></script>
     <!-- Firebase SDK (Compat 버전) -->
@@ -17,9 +17,9 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             color: white;
-            font-family: sans-serif;
+            font-family: 'Noto Sans KR', sans-serif;
         }
         #lobby {
             display: flex;
@@ -27,20 +27,24 @@
             align-items: center;
             gap: 15px;
             background: #2d2d2d;
-            padding: 30px;
+            padding: 25px;
             border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            width: 320px;
         }
         input {
             padding: 10px;
-            font-size: 18px;
+            font-size: 16px;
             text-align: center;
             border-radius: 6px;
-            border: none;
-            width: 150px;
+            border: 2px solid #4d94ff;
+            outline: none;
+            width: 80%;
+            background-color: #1a1a1a;
+            color: white;
         }
         button {
-            padding: 10px 20px;
+            padding: 12px 24px;
             font-size: 18px;
             background-color: #4d94ff;
             color: white;
@@ -48,9 +52,32 @@
             border-radius: 6px;
             cursor: pointer;
             font-weight: bold;
+            width: 90%;
+            transition: 0.2s;
         }
         button:hover {
             background-color: #3377e6;
+        }
+        #leaderboard-box {
+            margin-top: 10px;
+            width: 100%;
+            background: #1e1e1e;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        #leaderboard-list {
+            list-style: none;
+            padding: 0;
+            margin: 5px 0 0 0;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        #leaderboard-list li {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 8px;
+            border-bottom: 1px solid #333;
         }
         #game-container {
             display: none;
@@ -59,19 +86,27 @@
 </head>
 <body>
 
-    <!-- 방 접속 로비 화면 -->
+    <!-- 방 접속 및 랭킹 로비 화면 -->
     <div id="lobby">
-        <h2>🎮 실시간 퍼즐 대전</h2>
-        <p>방 코드를 입력하고 입장하세요!</p>
-        <input type="text" id="roomInput" value="1004" maxlength="6">
-        <button onclick="joinRoom()">게임 입장하기</button>
+        <h2 style="margin: 0;">🎮 30초 퍼즐 대전</h2>
+        <p style="font-size: 14px; color: #aaa; margin: 0;">닉네임을 입력하고 매칭하세요!</p>
+        <input type="text" id="nicknameInput" placeholder="닉네임 입력 (예: 학생1)" maxlength="8">
+        <button onclick="startMatchmaking()">⚡ 랜덤 대결 시작</button>
+
+        <!-- 실시간 누적 랭킹 목록 -->
+        <div id="leaderboard-box">
+            <div style="font-weight: bold; color: #ffd633; text-align: center;">🏆 실시간 누적 랭킹 (Top 10)</div>
+            <ul id="leaderboard-list">
+                <li style="color: #888;">로딩 중...</li>
+            </ul>
+        </div>
     </div>
 
     <!-- 게임 화면 -->
     <div id="game-container"></div>
 
     <script>
-        // Firebase 설정 적용
+        // Firebase 설정
         const firebaseConfig = {
             apiKey: "AIzaSyDL88cc1AvcAUW0_f8y7fQHkI2bqPB0028",
             authDomain: "puzzle-siry.firebaseapp.com",
@@ -85,37 +120,89 @@
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
+        let myNickname = "";
+        let opponentNickname = "상대방";
         let roomId = "";
         let playerRole = ""; // 'p1' 또는 'p2'
         let roomRef = null;
 
-        function joinRoom() {
-            const inputVal = document.getElementById('roomInput').value.trim();
-            if (!inputVal) {
-                alert('방 코드를 입력하세요!');
-                return;
-            }
-            roomId = inputVal;
-            roomRef = database.ref('rooms/' + roomId);
+        // --- 1. 실시간 누적 리더보드 로드 ---
+        function loadLeaderboard() {
+            database.ref('leaderboard').orderByChild('wins').limitToLast(10).on('value', (snapshot) => {
+                const listEl = document.getElementById('leaderboard-list');
+                listEl.innerHTML = '';
 
-            roomRef.once('value').then((snapshot) => {
-                const data = snapshot.val() || {};
+                const users = [];
+                snapshot.forEach(child => {
+                    users.push(child.val());
+                });
+                users.reverse(); // 승수 높은 순 정렬
 
-                if (!data.p1) {
-                    playerRole = 'p1';
-                } else if (!data.p2) {
-                    playerRole = 'p2';
-                } else {
-                    playerRole = 'p1';
+                if (users.length === 0) {
+                    listEl.innerHTML = '<li style="text-align:center; color:#888;">기록이 없습니다.</li>';
+                    return;
                 }
 
-                // 서버에 내 점수 초기화 및 접속 해제 처리
-                roomRef.child(playerRole).set({ score: 0 });
-                roomRef.child(playerRole).onDisconnect().remove();
+                users.forEach((u, idx) => {
+                    const rankBadge = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span>${rankBadge} <b>${u.nickname}</b></span> <span>${u.wins || 0}승 (${u.totalScore || 0}점)</span>`;
+                    listEl.appendChild(li);
+                });
+            });
+        }
+        loadLeaderboard();
 
-                // 로비 숨기고 게임 화면 표시
-                document.getElementById('lobby').style.display = 'none';
-                document.getElementById('game-container').style.display = 'block';
+        // --- 2. 랜덤 매칭 로직 ---
+        function startMatchmaking() {
+            const nickInput = document.getElementById('nicknameInput').value.trim();
+            if (!nickInput) {
+                alert('닉네임을 입력해주세요!');
+                return;
+            }
+            myNickname = nickInput;
+
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('game-container').style.display = 'block';
+
+            const roomsRef = database.ref('rooms');
+            
+            // 대기중인 방 탐색
+            roomsRef.once('value').then((snapshot) => {
+                const rooms = snapshot.val() || {};
+                let foundRoomId = null;
+
+                for (let rId in rooms) {
+                    if (rooms[rId].status === 'waiting' && rooms[rId].p1 && !rooms[rId].p2) {
+                        foundRoomId = rId;
+                        break;
+                    }
+                }
+
+                if (foundRoomId) {
+                    // 기존 대기방에 입장 (P2)
+                    playerRole = 'p2';
+                    roomId = foundRoomId;
+                    roomRef = database.ref('rooms/' + roomId);
+
+                    roomRef.update({
+                        p2: { nickname: myNickname, score: 0 },
+                        status: 'playing'
+                    });
+                } else {
+                    // 새로운 방 생성 (P1)
+                    playerRole = 'p1';
+                    roomRef = roomsRef.push();
+                    roomId = roomRef.key;
+
+                    roomRef.set({
+                        p1: { nickname: myNickname, score: 0 },
+                        status: 'waiting'
+                    });
+                }
+
+                // 접속 해제 이벤트 설정
+                roomRef.child(playerRole).onDisconnect().remove();
 
                 startGame();
             });
@@ -125,7 +212,6 @@
         const TILE_SIZE = 50;
         const BOARD_OFFSET_X = 40;
         const BOARD_OFFSET_Y = 90;
-
         const COLORS = [0xff4d4d, 0x4d94ff, 0x4dff88, 0xffd633, 0xcc66ff];
 
         function startGame() {
@@ -148,23 +234,21 @@
 
         function create() {
             this.selectedTile = null;
-            this.canMove = false; // 상대 입장 전까지 조작 불가
+            this.canMove = false;
             this.score = 0;
             this.opponentScore = 0;
-            this.timeLeft = 60;
+            this.timeLeft = 30; // 30초 대결
             this.isGameOver = false;
             this.isGameStarted = false;
 
-            let roleText = playerRole === 'p1' ? '플레이어 1' : '플레이어 2';
-            this.add.text(BOARD_OFFSET_X, 10, `[내 정보: ${roleText}]`, { fontSize: '14px', color: '#4d94ff' });
+            this.add.text(BOARD_OFFSET_X, 10, `[나: ${myNickname}]`, { fontSize: '14px', color: '#4d94ff', fontStyle: 'bold' });
             
-            // 타이머 표시
-            this.timerText = this.add.text(BOARD_OFFSET_X + 220, 10, '⏱ 남은 시간: 60초', { fontSize: '15px', color: '#ffd633', fontStyle: 'bold' });
+            // 30초 타이머 표기
+            this.timerText = this.add.text(BOARD_OFFSET_X + 220, 10, '⏱ 남은 시간: 30초', { fontSize: '15px', color: '#ffd633', fontStyle: 'bold' });
 
             this.myScoreText = this.add.text(BOARD_OFFSET_X, 35, '내 점수: 0', { fontSize: '18px', color: '#ffffff', fontStyle: 'bold' });
             this.opponentScoreText = this.add.text(BOARD_OFFSET_X + 220, 35, '상대 점수: 대기중', { fontSize: '18px', color: '#ff4d4d', fontStyle: 'bold' });
 
-            // 퍼즐 타일 테스처 생성
             COLORS.forEach((color, index) => {
                 let g = this.add.graphics();
                 g.fillStyle(color, 1);
@@ -173,7 +257,6 @@
                 g.destroy();
             });
 
-            // 보드판 생성
             this.board = [];
             for (let row = 0; row < GRID_SIZE; row++) {
                 this.board[row] = [];
@@ -184,46 +267,36 @@
                 }
             }
 
-            // --- [상대방 대기 화면 오버레이] ---
+            // 대기 오버레이
             this.waitingOverlay = this.add.graphics();
             this.waitingOverlay.fillStyle(0x000000, 0.85);
             this.waitingOverlay.fillRect(0, 0, 480, 520);
             this.waitingOverlay.setDepth(10);
 
-            this.waitingText = this.add.text(240, 230, `상대방 접속 대기 중...\n\n[ 방 코드: ${roomId} ]`, {
-                fontSize: '22px',
-                color: '#ffffff',
-                align: 'center',
-                fontStyle: 'bold'
+            this.waitingText = this.add.text(240, 240, `🔍 매칭 상대 찾는 중...`, {
+                fontSize: '22px', color: '#ffffff', align: 'center', fontStyle: 'bold'
             }).setOrigin(0.5).setDepth(11);
 
-            this.waitingSubText = this.add.text(240, 310, '상대가 입장하면 자동으로 게임이 시작됩니다.', {
-                fontSize: '14px',
-                color: '#ffd633'
-            }).setOrigin(0.5).setDepth(11);
-
-            // 실시간 방 상태 체크 (두 명 모두 입장했는지 감지)
+            // 실시간 상태 감지
             roomRef.on('value', (snapshot) => {
                 const data = snapshot.val() || {};
 
-                // 상대방 점수 표시
                 let opponentRole = playerRole === 'p1' ? 'p2' : 'p1';
-                if (data[opponentRole] && data[opponentRole].score !== undefined) {
-                    this.opponentScore = data[opponentRole].score;
-                    this.opponentScoreText.setText('상대 점수: ' + this.opponentScore);
+                if (data[opponentRole]) {
+                    opponentNickname = data[opponentRole].nickname || "상대방";
+                    if (data[opponentRole].score !== undefined) {
+                        this.opponentScore = data[opponentRole].score;
+                        this.opponentScoreText.setText(`${opponentNickname}: ${this.opponentScore}`);
+                    }
                 }
 
-                // 두 명이 모두 입장했는지 확인
-                if (data.p1 && data.p2 && !this.isGameStarted) {
+                if (data.status === 'playing' && !this.isGameStarted) {
                     this.isGameStarted = true;
                     this.canMove = true;
 
-                    // 대기창 제거
                     if (this.waitingOverlay) this.waitingOverlay.destroy();
                     if (this.waitingText) this.waitingText.destroy();
-                    if (this.waitingSubText) this.waitingSubText.destroy();
 
-                    // 타이머 시작
                     this.timeEvent = this.time.addEvent({
                         delay: 1000,
                         callback: onTimerTick,
@@ -251,14 +324,15 @@
             this.canMove = false;
 
             let overlay = this.add.graphics();
-            overlay.fillStyle(0x000000, 0.85);
+            overlay.fillStyle(0x000000, 0.88);
             overlay.fillRect(0, 0, 480, 520);
             overlay.setDepth(20);
 
+            let isWin = this.score > this.opponentScore;
             let resultMessage = "";
             let resultColor = "#ffffff";
 
-            if (this.score > this.opponentScore) {
+            if (isWin) {
                 resultMessage = "🏆 승리했습니다! 🏆";
                 resultColor = "#4dff88";
             } else if (this.score < this.opponentScore) {
@@ -269,20 +343,43 @@
                 resultColor = "#ffd633";
             }
 
-            this.add.text(240, 160, '게임 종료', { fontSize: '28px', color: '#aaaaaa' }).setOrigin(0.5).setDepth(21);
-            this.add.text(240, 220, resultMessage, { fontSize: '32px', color: resultColor, fontStyle: 'bold' }).setOrigin(0.5).setDepth(21);
-            this.add.text(240, 290, `내 최종 점수: ${this.score}점`, { fontSize: '20px', color: '#ffffff' }).setOrigin(0.5).setDepth(21);
-            this.add.text(240, 320, `상대 최종 점수: ${this.opponentScore}점`, { fontSize: '20px', color: '#ffaaaa' }).setOrigin(0.5).setDepth(21);
+            // --- 3. 누적 랭킹 서버 업데이트 ---
+            saveLeaderboardResult(myNickname, this.score, isWin);
 
-            let restartBtn = this.add.text(240, 390, '🔄 다시 하기', {
-                fontSize: '22px',
-                color: '#ffffff',
-                backgroundColor: '#4d94ff',
-                padding: { x: 20, y: 10 }
+            this.add.text(240, 150, '30초 대결 종료', { fontSize: '26px', color: '#aaaaaa' }).setOrigin(0.5).setDepth(21);
+            this.add.text(240, 210, resultMessage, { fontSize: '32px', color: resultColor, fontStyle: 'bold' }).setOrigin(0.5).setDepth(21);
+            this.add.text(240, 280, `내 점수 (${myNickname}): ${this.score}점`, { fontSize: '18px', color: '#ffffff' }).setOrigin(0.5).setDepth(21);
+            this.add.text(240, 310, `상대 점수 (${opponentNickname}): ${this.opponentScore}점`, { fontSize: '18px', color: '#ffaaaa' }).setOrigin(0.5).setDepth(21);
+
+            let restartBtn = this.add.text(240, 380, '🔄 다시 매칭하기', {
+                fontSize: '20px', color: '#ffffff', backgroundColor: '#4d94ff', padding: { x: 20, y: 10 }
             }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(21);
 
             restartBtn.on('pointerdown', () => {
                 location.reload();
+            });
+        }
+
+        function saveLeaderboardResult(nickname, finalScore, isWin) {
+            const safeKey = nickname.replace(/[.#$\[\]/]/g, "_"); // 특수문자 치환
+            const userRef = database.ref('leaderboard/' + safeKey);
+
+            userRef.transaction((currentData) => {
+                if (!currentData) {
+                    return {
+                        nickname: nickname,
+                        wins: isWin ? 1 : 0,
+                        totalScore: finalScore,
+                        games: 1
+                    };
+                } else {
+                    return {
+                        nickname: nickname,
+                        wins: (currentData.wins || 0) + (isWin ? 1 : 0),
+                        totalScore: (currentData.totalScore || 0) + finalScore,
+                        games: (currentData.games || 0) + 1
+                    };
+                }
             });
         }
 
@@ -420,7 +517,7 @@
                     let t2 = this.board[row][col + 1];
                     let t3 = this.board[row + 1][col];
                     let t4 = this.board[row + 1][col + 1];
-                    if (t1 && t2 && t3 && t1.colorIndex === t2.colorIndex && t1.colorIndex === t3.colorIndex && t1.colorIndex === t4.colorIndex) {
+                    if (t1 && t2 && t3 && t4 && t1.colorIndex === t2.colorIndex && t1.colorIndex === t3.colorIndex && t1.colorIndex === t4.colorIndex) {
                         matchedTiles.add(t1); matchedTiles.add(t2); matchedTiles.add(t3); matchedTiles.add(t4);
                     }
                 }
