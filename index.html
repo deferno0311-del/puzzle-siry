@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 대전 Match-3 퍼즐 게임</title>
+    <!-- Phaser 3 게임 엔진 -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.0/dist/phaser.min.js"></script>
+    <!-- Firebase SDK (Compat 버전) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background-color: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            font-family: sans-serif;
+        }
+        #lobby {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            background: #2d2d2d;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        input {
+            padding: 10px;
+            font-size: 18px;
+            text-align: center;
+            border-radius: 6px;
+            border: none;
+            width: 150px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #4d94ff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #3377e6;
+        }
+        #game-container {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 방 접속 로비 화면 -->
+    <div id="lobby">
+        <h2>🎮 실시간 퍼즐 대전</h2>
+        <p>방 코드를 입력하고 입장하세요!</p>
+        <input type="text" id="roomInput" value="1004" maxlength="6">
+        <button onclick="joinRoom()">게임 입장하기</button>
+    </div>
+
+    <!-- 게임 화면 -->
+    <div id="game-container"></div>
+
+    <script>
+        // Firebase 설정 적용
+        const firebaseConfig = {
+            apiKey: "AIzaSyDL88cc1AvcAUW0_f8y7fQHkI2bqPB0028",
+            authDomain: "puzzle-siry.firebaseapp.com",
+            databaseURL: "https://puzzle-siry-default-rtdb.firebaseio.com",
+            projectId: "puzzle-siry",
+            storageBucket: "puzzle-siry.firebasestorage.app",
+            messagingSenderId: "786436907175",
+            appId: "1:786436907175:web:6a207f29b484ad6119fb82"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let roomId = "";
+        let playerRole = ""; // 'p1' 또는 'p2'
+        let roomRef = null;
+
+        function joinRoom() {
+            const inputVal = document.getElementById('roomInput').value.trim();
+            if (!inputVal) {
+                alert('방 코드를 입력하세요!');
+                return;
+            }
+            roomId = inputVal;
+            roomRef = database.ref('rooms/' + roomId);
+
+            roomRef.once('value').then((snapshot) => {
+                const data = snapshot.val() || {};
+
+                if (!data.p1) {
+                    playerRole = 'p1';
+                } else if (!data.p2) {
+                    playerRole = 'p2';
+                } else {
+                    playerRole = 'p1';
+                }
+
+                // 서버에 내 점수 초기화 및 접속 해제 처리
+                roomRef.child(playerRole).set({ score: 0 });
+                roomRef.child(playerRole).onDisconnect().remove();
+
+                // 로비 숨기고 게임 화면 표시
+                document.getElementById('lobby').style.display = 'none';
+                document.getElementById('game-container').style.display = 'block';
+
+                startGame();
+            });
+        }
+
+        const GRID_SIZE = 8;
+        const TILE_SIZE = 50;
+        const BOARD_OFFSET_X = 40;
+        const BOARD_OFFSET_Y = 90;
+
+        const COLORS = [0xff4d4d, 0x4d94ff, 0x4dff88, 0xffd633, 0xcc66ff];
+
+        function startGame() {
+            const config = {
+                type: Phaser.AUTO,
+                width: 480,
+                height: 520,
+                backgroundColor: '#2d2d2d',
+                parent: 'game-container',
+                scene: {
+                    preload: preload,
+                    create: create,
+                    update: update
+                }
+            };
+            new Phaser.Game(config);
+        }
+
+        function preload() {}
+
+        function create() {
+            this.selectedTile = null;
+            this.canMove = true;
+            this.score = 0;
+            this.opponentScore = 0;
+            this.timeLeft = 60;
+            this.isGameOver = false;
+
+            let roleText = playerRole === 'p1' ? '플레이어 1' : '플레이어 2';
+            this.add.text(BOARD_OFFSET_X, 10, `[내 정보: ${roleText}]`, { fontSize: '14px', color: '#4d94ff' });
+            
+            // 타이머 표시
+            this.timerText = this.add.text(BOARD_OFFSET_X + 220, 10, '⏱️️ 남은 시간: 60초', { fontSize: '15px', color: '#ffd633', fontStyle: 'bold' });
+
+            this.myScoreText = this.add.text(BOARD_OFFSET_X, 35, '내 점수: 0', { fontSize: '18px', color: '#ffffff', fontStyle: 'bold' });
+            this.opponentScoreText = this.add.text(BOARD_OFFSET_X + 220, 35, '상대 점수: 0', { fontSize: '18px', color: '#ff4d4d', fontStyle: 'bold' });
+
+            // 상대방 점수 실시간 연동
+            let opponentRole = playerRole === 'p1' ? 'p2' : 'p1';
+            roomRef.child(opponentRole).on('value', (snapshot) => {
+                const val = snapshot.val();
+                if (val && val.score !== undefined) {
+                    this.opponentScore = val.score;
+                    this.opponentScoreText.setText('상대 점수: ' + this.opponentScore);
+                } else {
+                    this.opponentScoreText.setText('상대 점수: 대기중');
+                }
+            });
+
+            // 1초마다 타이머 감소
+            this.timeEvent = this.time.addEvent({
+                delay: 1000,
+                callback: onTimerTick,
+                callbackScope: this,
+                loop: true
+            });
+
+            COLORS.forEach((color, index) => {
+                let g = this.add.graphics();
+                g.fillStyle(color, 1);
+                g.fillRoundedRect(0, 0, TILE_SIZE - 4, TILE_SIZE - 4, 10);
+                g.generateTexture('tile_' + index, TILE_SIZE - 4, TILE_SIZE - 4);
+                g.destroy();
+            });
+
+            this.board = [];
+            for (let row = 0; row < GRID_SIZE; row++) {
+                this.board[row] = [];
+                for (let col = 0; col < GRID_SIZE; col++) {
+                    let colorIndex = getValidColorIndex.call(this, row, col);
+                    let tile = createTile.call(this, row, col, colorIndex);
+                    this.board[row][col] = tile;
+                }
+            }
+        }
+
+        function onTimerTick() {
+            if (this.isGameOver) return;
+
+            this.timeLeft--;
+            this.timerText.setText(`⏱️ 남은 시간: ${this.timeLeft}초`);
+
+            if (this.timeLeft <= 0) {
+                this.timeEvent.remove();
+                showGameOverScreen.call(this);
+            }
+        }
+
+        function showGameOverScreen() {
+            this.isGameOver = true;
+            this.canMove = false;
+
+            // 어두운 배경 오버레이
+            let overlay = this.add.graphics();
+            overlay.fillStyle(0x000000, 0.85);
+            overlay.fillRect(0, 0, 480, 520);
+
+            let resultMessage = "";
+            let resultColor = "#ffffff";
+
+            if (this.score > this.opponentScore) {
+                resultMessage = "🏆 승리했습니다! 🏆";
+                resultColor = "#4dff88";
+            } else if (this.score < this.opponentScore) {
+                resultMessage = "📢 패배했습니다...";
+                resultColor = "#ff4d4d";
+            } else {
+                resultMessage = "🤝 무승부입니다!";
+                resultColor = "#ffd633";
+            }
+
+            // 결과 텍스트
+            this.add.text(240, 160, '게임 종료', { fontSize: '28px', color: '#aaaaaa' }).setOrigin(0.5);
+            this.add.text(240, 220, resultMessage, { fontSize: '32px', color: resultColor, fontStyle: 'bold' }).setOrigin(0.5);
+            this.add.text(240, 290, `내 최종 점수: ${this.score}점`, { fontSize: '20px', color: '#ffffff' }).setOrigin(0.5);
+            this.add.text(240, 320, `상대 최종 점수: ${this.opponentScore}점`, { fontSize: '20px', color: '#ffaaaa' }).setOrigin(0.5);
+
+            // 새로고침 버튼
+            let restartBtn = this.add.text(240, 390, '🔄 다시 하기', {
+                fontSize: '22px',
+                color: '#ffffff',
+                backgroundColor: '#4d94ff',
+                padding: { x: 20, y: 10 }
+            }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+            restartBtn.on('pointerdown', () => {
+                location.reload();
+            });
+        }
+
+        function getValidColorIndex(row, col) {
+            let validColors = [];
+            for (let i = 0; i < COLORS.length; i++) {
+                let left1 = (col >= 1 && this.board[row][col - 1]) ? this.board[row][col - 1].colorIndex : -1;
+                let left2 = (col >= 2 && this.board[row][col - 2]) ? this.board[row][col - 2].colorIndex : -1;
+                let up1 = (row >= 1 && this.board[row - 1][col]) ? this.board[row - 1][col].colorIndex : -1;
+                let up2 = (row >= 2 && this.board[row - 2][col]) ? this.board[row - 2][col].colorIndex : -1;
+                let upLeft = (row >= 1 && col >= 1 && this.board[row - 1][col - 1]) ? this.board[row - 1][col - 1].colorIndex : -1;
+
+                if (i === left1 && i === left2) continue;
+                if (i === up1 && i === up2) continue;
+                if (i === left1 && i === up1 && i === upLeft) continue;
+
+                validColors.push(i);
+            }
+            return validColors[Phaser.Math.Between(0, validColors.length - 1)];
+        }
+
+        function createTile(row, col, colorIndex) {
+            if (colorIndex === undefined) {
+                colorIndex = Phaser.Math.Between(0, COLORS.length - 1);
+            }
+            let x = BOARD_OFFSET_X + col * TILE_SIZE + TILE_SIZE / 2;
+            let y = BOARD_OFFSET_Y + row * TILE_SIZE + TILE_SIZE / 2;
+
+            let tile = this.add.image(x, y, 'tile_' + colorIndex);
+            tile.colorIndex = colorIndex;
+            tile.row = row;
+            tile.col = col;
+
+            tile.setInteractive();
+            tile.on('pointerdown', () => selectTile.call(this, tile));
+
+            return tile;
+        }
+
+        function selectTile(tile) {
+            if (!this.canMove || this.isGameOver) return;
+
+            if (!this.selectedTile) {
+                this.selectedTile = tile;
+                tile.setAlpha(0.5);
+            } else {
+                if (this.selectedTile === tile) {
+                    this.selectedTile.setAlpha(1);
+                    this.selectedTile = null;
+                    return;
+                }
+
+                let isAdjacent = (Math.abs(this.selectedTile.row - tile.row) + Math.abs(this.selectedTile.col - tile.col)) === 1;
+
+                if (isAdjacent) {
+                    swapTiles.call(this, this.selectedTile, tile, true);
+                } else {
+                    this.selectedTile.setAlpha(1);
+                    this.selectedTile = tile;
+                    tile.setAlpha(0.5);
+                }
+            }
+        }
+
+        function swapTiles(tile1, tile2, checkMatchAfterSwap) {
+            this.canMove = false;
+            tile1.setAlpha(1);
+
+            this.board[tile1.row][tile1.col] = tile2;
+            this.board[tile2.row][tile2.col] = tile1;
+
+            let tempRow = tile1.row;
+            let tempCol = tile1.col;
+            tile1.row = tile2.row;
+            tile1.col = tile2.col;
+            tile2.row = tempRow;
+            tile2.col = tempCol;
+
+            let x1 = BOARD_OFFSET_X + tile1.col * TILE_SIZE + TILE_SIZE / 2;
+            let y1 = BOARD_OFFSET_Y + tile1.row * TILE_SIZE + TILE_SIZE / 2;
+            let x2 = BOARD_OFFSET_X + tile2.col * TILE_SIZE + TILE_SIZE / 2;
+            let y2 = BOARD_OFFSET_Y + tile2.row * TILE_SIZE + TILE_SIZE / 2;
+
+            this.tweens.add({ targets: tile1, x: x1, y: y1, duration: 200 });
+            this.tweens.add({
+                targets: tile2,
+                x: x2,
+                y: y2,
+                duration: 200,
+                onComplete: () => {
+                    this.selectedTile = null;
+
+                    if (checkMatchAfterSwap) {
+                        let matches = checkMatches.call(this);
+                        if (matches.length > 0) {
+                            processMatches.call(this, matches);
+                        } else {
+                            swapTiles.call(this, tile1, tile2, false);
+                        }
+                    } else {
+                        if (!this.isGameOver) this.canMove = true;
+                    }
+                }
+            });
+        }
+
+        function checkMatches() {
+            let matchedTiles = new Set();
+
+            for (let row = 0; row < GRID_SIZE; row++) {
+                for (let col = 0; col < GRID_SIZE - 2; col++) {
+                    let t1 = this.board[row][col];
+                    let t2 = this.board[row][col + 1];
+                    let t3 = this.board[row][col + 2];
+                    if (t1 && t2 && t3 && t1.colorIndex === t2.colorIndex && t2.colorIndex === t3.colorIndex) {
+                        matchedTiles.add(t1); matchedTiles.add(t2); matchedTiles.add(t3);
+                    }
+                }
+            }
+
+            for (let col = 0; col < GRID_SIZE; col++) {
+                for (let row = 0; row < GRID_SIZE - 2; row++) {
+                    let t1 = this.board[row][col];
+                    let t2 = this.board[row + 1][col];
+                    let t3 = this.board[row + 2][col];
+                    if (t1 && t2 && t3 && t1.colorIndex === t2.colorIndex && t2.colorIndex === t3.colorIndex) {
+                        matchedTiles.add(t1); matchedTiles.add(t2); matchedTiles.add(t3);
+                    }
+                }
+            }
+
+            for (let row = 0; row < GRID_SIZE - 1; row++) {
+                for (let col = 0; col < GRID_SIZE - 1; col++) {
+                    let t1 = this.board[row][col];
+                    let t2 = this.board[row][col + 1];
+                    let t3 = this.board[row + 1][col];
+                    let t4 = this.board[row + 1][col + 1];
+                    if (t1 && t2 && t3 && t4 && t1.colorIndex === t2.colorIndex && t1.colorIndex === t3.colorIndex && t1.colorIndex === t4.colorIndex) {
+                        matchedTiles.add(t1); matchedTiles.add(t2); matchedTiles.add(t3); matchedTiles.add(t4);
+                    }
+                }
+            }
+
+            return Array.from(matchedTiles);
+        }
+
+        function processMatches(matches) {
+            this.score += matches.length * 100;
+            this.myScoreText.setText('내 점수: ' + this.score);
+
+            if (roomRef && playerRole) {
+                roomRef.child(playerRole).update({ score: this.score });
+            }
+
+            this.tweens.add({
+                targets: matches,
+                scaleX: 0,
+                scaleY: 0,
+                alpha: 0,
+                duration: 250,
+                onComplete: () => {
+                    matches.forEach(tile => {
+                        this.board[tile.row][tile.col] = null;
+                        tile.destroy();
+                    });
+
+                    dropAndRefill.call(this);
+                }
+            });
+        }
+
+        function dropAndRefill() {
+            let dropTweens = [];
+
+            for (let col = 0; col < GRID_SIZE; col++) {
+                let emptySpaces = 0;
+
+                for (let row = GRID_SIZE - 1; row >= 0; row--) {
+                    if (this.board[row][col] === null) {
+                        emptySpaces++;
+                    } else if (emptySpaces > 0) {
+                        let tile = this.board[row][col];
+                        let targetRow = row + emptySpaces;
+
+                        this.board[targetRow][col] = tile;
+                        this.board[row][col] = null;
+                        tile.row = targetRow;
+
+                        let targetY = BOARD_OFFSET_Y + targetRow * TILE_SIZE + TILE_SIZE / 2;
+                        dropTweens.push({ targets: tile, y: targetY, duration: 300 });
+                    }
+                }
+
+                for (let i = 0; i < emptySpaces; i++) {
+                    let targetRow = emptySpaces - 1 - i;
+                    let tile = createTile.call(this, targetRow, col);
+
+                    let targetY = BOARD_OFFSET_Y + targetRow * TILE_SIZE + TILE_SIZE / 2;
+                    tile.y = BOARD_OFFSET_Y - (i + 1) * TILE_SIZE;
+
+                    this.board[targetRow][col] = tile;
+                    dropTweens.push({ targets: tile, y: targetY, duration: 300 });
+                }
+            }
+
+            if (dropTweens.length > 0) {
+                dropTweens.forEach((t, idx) => {
+                    this.tweens.add({
+                        ...t,
+                        onComplete: idx === dropTweens.length - 1 ? () => {
+                            let nextMatches = checkMatches.call(this);
+                            if (nextMatches.length > 0) {
+                                processMatches.call(this, nextMatches);
+                            } else {
+                                if (!this.isGameOver) this.canMove = true;
+                            }
+                        } : null
+                    });
+                });
+            } else {
+                if (!this.isGameOver) this.canMove = true;
+            }
+        }
+
+        function update() {}
+    </script>
+</body>
+</html>
