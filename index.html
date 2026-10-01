@@ -3,784 +3,2410 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>실시간 퀴즈 공격 퍼즐 대전</title>
-    <!-- Phaser 3 게임 엔진 -->
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.0/dist/phaser.min.js"></script>
-    <!-- Firebase SDK (Compat 버전) -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <title>퀴즈 퍼즐 대전 - 사칙연산 Match-3</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- FontAwesome -->
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    >
+
+    <!-- Phaser -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+
+    <!-- Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Noto+Sans+KR:wght@400;600;700;900&display=swap"
+        rel="stylesheet"
+    >
+
     <style>
         body {
-            margin: 0;
-            background-color: #1a1a1a;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            color: white;
-            font-family: 'Noto Sans KR', sans-serif;
-        }
-        #lobby {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 15px;
-            background: #2d2d2d;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
-            width: 320px;
-        }
-        input {
-            padding: 10px;
-            font-size: 16px;
-            text-align: center;
-            border-radius: 6px;
-            border: 2px solid #4d94ff;
-            outline: none;
-            width: 80%;
-            background-color: #1a1a1a;
-            color: white;
-        }
-        button {
-            padding: 12px 24px;
-            font-size: 18px;
-            background-color: #4d94ff;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            width: 90%;
-            transition: 0.2s;
-        }
-        button:hover {
-            background-color: #3377e6;
-        }
-        #leaderboard-box {
-            margin-top: 10px;
-            width: 100%;
-            background: #1e1e1e;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-        #leaderboard-list {
-            list-style: none;
-            padding: 0;
-            margin: 5px 0 0 0;
-            max-height: 150px;
-            overflow-y: auto;
-        }
-        #leaderboard-list li {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 8px;
-            border-bottom: 1px solid #333;
-        }
-        #game-container {
-            display: none;
-            position: relative;
+            font-family: 'Noto Sans KR', 'Outfit', sans-serif;
+            background: radial-gradient(
+                circle at center,
+                #1b153a 0%,
+                #0c091d 100%
+            );
+            color: #ffffff;
+            overflow-x: hidden;
+            user-select: none;
         }
 
-        /* 퀴즈 공격 모달 창 스타일 (모바일 터치 최적화) */
-        #quiz-modal {
-            display: none;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 320px;
-            background: #22223b;
-            border: 3px solid #ff4d4d;
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 0 20px rgba(255, 77, 77, 0.6);
-            text-align: center;
-            z-index: 9999; /* Phaser 캔버스 터치 레이어보다 높게 설정 */
-            pointer-events: auto; /* 터치 이벤트 인식 보장 */
-            touch-action: manipulation;
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
         }
-        #quiz-modal h3 {
-            margin: 0 0 10px 0;
-            color: #ff4d4d;
-            font-size: 20px;
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
         }
-        #quiz-question {
-            font-size: 18px;
-            margin-bottom: 15px;
-            font-weight: bold;
-            color: #ffffff;
+
+        @keyframes damageFlash {
+            0% {
+                opacity: 0;
+            }
+            20% {
+                opacity: 0.85;
+            }
+            100% {
+                opacity: 0;
+            }
         }
-        .quiz-option-btn {
-            display: block;
+
+        .animate-damage {
+            animation: damageFlash 0.45s ease-out forwards;
+        }
+
+        @keyframes toastIn {
+            from {
+                transform: translateY(-30px) scale(0.9);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+        }
+
+        .animate-toast {
+            animation: toastIn 0.3s ease-out forwards;
+        }
+
+        #phaser-container {
             width: 100%;
-            padding: 12px; /* 모바일 터치 영역 확장 */
-            margin: 6px 0;
-            font-size: 16px;
-            background-color: #4a4e69;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            touch-action: manipulation;
-            -webkit-tap-highlight-color: transparent;
+            max-width: 432px;
+            aspect-ratio: 1 / 1;
+            margin: 0 auto;
         }
-        .quiz-option-btn:hover {
-            background-color: #9a8c98;
+
+        #phaser-container canvas {
+            display: block;
+            border-radius: 1rem;
+            touch-action: none;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.65;
         }
     </style>
 </head>
-<body>
 
-    <!-- 방 접속 및 랭킹 로비 화면 -->
-    <div id="lobby">
-        <h2 style="margin: 0;">🎮 퀴즈 공격 퍼즐 대전</h2>
-        <p style="font-size: 13px; color: #aaa; margin: 0;">2x2를 터뜨려 상대 점수를 깎으세요!</p>
-        <input type="text" id="nicknameInput" placeholder="닉네임 입력 (예: 학생1)" maxlength="8">
-        <button onclick="startMatchmaking()">⚡ 대결 시작하기</button>
+<body class="min-h-screen flex flex-col items-center justify-center p-3 sm:p-6 relative">
 
-        <!-- 실시간 누적 랭킹 목록 -->
-        <div id="leaderboard-box">
-            <div style="font-weight: bold; color: #ffd633; text-align: center;">🏆 실시간 누적 랭킹 (Top 10)</div>
-            <ul id="leaderboard-list">
-                <li style="color: #888;">로딩 중...</li>
-            </ul>
+    <!-- 피격 효과 -->
+    <div
+        id="damage-overlay"
+        class="fixed inset-0 bg-red-600/50 z-50 pointer-events-none hidden"
+    ></div>
+
+    <!-- 알림 -->
+    <div
+        id="toast-container"
+        class="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center w-full max-w-sm px-4 pointer-events-none"
+        role="status"
+        aria-live="polite"
+    ></div>
+
+    <main class="w-full max-w-4xl min-h-[650px] flex flex-col relative z-10">
+
+        <!-- 로비 -->
+        <section
+            id="lobby-screen"
+            class="glass-panel rounded-3xl p-6 sm:p-10 flex flex-col items-center justify-between my-auto w-full max-w-2xl mx-auto text-center"
+        >
+            <div>
+                <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500/20 border border-purple-400/30 text-purple-300 text-xs font-semibold mb-4">
+                    <i class="fa-solid fa-bolt text-yellow-400"></i>
+                    1v1 퍼즐 · 사칙연산 퀴즈 대전
+                </div>
+
+                <h1 class="text-3xl sm:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-yellow-300 mb-3">
+                    QUIZ ATTACK 3-MATCH
+                </h1>
+
+                <p class="text-slate-300 text-sm sm:text-base max-w-md mx-auto mb-4 leading-relaxed">
+                    3개 이상의 동일 블록을 맞춰 점수를 얻으세요.
+                    <span class="text-yellow-300 font-bold">
+                        2×2 동일 블록
+                    </span>
+                    이 포함된 반응이 발생하면 사칙연산 퀴즈가 발동합니다.
+                </p>
+
+                <p class="text-sm leading-relaxed">
+                    정답을 맞히면
+                    <span class="text-green-400 font-bold">
+                        내 점수 +500점
+                    </span>
+                    과
+                    <span class="text-red-400 font-bold">
+                        상대방 점수 -500점
+                    </span>
+                    이 적용됩니다.
+                </p>
+
+                <p class="text-xs text-slate-400 mt-2">
+                    점수는 음수가 될 수 있습니다.
+                </p>
+            </div>
+
+            <div class="w-full max-w-sm space-y-4 my-6">
+                <div class="relative">
+                    <i class="fa-solid fa-user absolute left-4 top-1/2 -translate-y-1/2 text-purple-300/60"></i>
+
+                    <input
+                        type="text"
+                        id="player-nickname"
+                        maxlength="10"
+                        placeholder="닉네임을 입력하세요"
+                        aria-label="플레이어 닉네임"
+                        class="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-400/50 font-bold"
+                    >
+                </div>
+
+                <button
+                    id="btn-find-match"
+                    type="button"
+                    onclick="startMatchmaking()"
+                    disabled
+                    class="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 text-white font-extrabold text-lg active:scale-95 transition flex items-center justify-center gap-3"
+                >
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    연결 상태를 확인하고 있습니다.
+                </button>
+
+                <button
+                    id="btn-ai-match"
+                    type="button"
+                    onclick="startAIMatch()"
+                    disabled
+                    class="w-full py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-slate-200 font-bold text-sm border border-white/20 transition flex items-center justify-center gap-2"
+                >
+                    <i class="fa-solid fa-robot text-purple-400"></i>
+                    AI 봇 연습 모드를 시작합니다.
+                </button>
+
+                <button
+                    id="btn-cancel-match"
+                    type="button"
+                    onclick="cancelMatchmaking()"
+                    class="hidden w-full py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-slate-200 font-bold text-sm border border-white/20"
+                >
+                    매칭을 취소합니다.
+                </button>
+
+                <p
+                    id="connection-status"
+                    class="text-xs text-slate-400"
+                >
+                    연결 상태를 확인하고 있습니다.
+                </p>
+            </div>
+
+            <div class="w-full mt-2 glass-card rounded-2xl p-4 text-left">
+                <div class="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
+                    <span class="text-xs font-bold text-purple-300 flex items-center gap-2">
+                        <i class="fa-solid fa-trophy text-yellow-400"></i>
+                        명예의 전당 Top 5
+                    </span>
+
+                    <span class="text-[10px] text-slate-400">
+                        온라인 대전 기록입니다.
+                    </span>
+                </div>
+
+                <div
+                    id="leaderboard-list"
+                    class="space-y-2 text-sm"
+                >
+                    <p class="text-center py-3 text-slate-400 text-xs">
+                        순위 정보를 불러오고 있습니다.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 게임 -->
+        <section
+            id="game-screen"
+            class="hidden flex-col w-full max-w-3xl mx-auto space-y-4"
+        >
+            <div class="glass-panel rounded-2xl p-4 flex flex-col gap-3">
+                <div class="flex items-center justify-between text-xs font-bold text-slate-300 px-1">
+                    <span class="text-yellow-300 text-sm flex items-center gap-1.5">
+                        <i class="fa-solid fa-clock"></i>
+                        남은 시간:
+                        <span
+                            id="game-timer"
+                            class="text-base text-white font-black"
+                        >45</span>
+                        초
+                    </span>
+
+                    <span
+                        id="match-status-tag"
+                        class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-0.5 rounded-full text-[11px]"
+                    >
+                        대전을 진행하고 있습니다.
+                    </span>
+                </div>
+
+                <div class="w-full bg-slate-800/80 h-3 rounded-full overflow-hidden border border-white/10 p-0.5">
+                    <div
+                        id="timer-progress"
+                        class="bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-500 h-full rounded-full w-full"
+                    ></div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mt-1">
+                    <div class="glass-card rounded-xl p-3 flex items-center gap-3 border-l-4 border-l-purple-500">
+                        <div class="w-10 h-10 shrink-0 rounded-full bg-purple-500/30 border border-purple-400/50 flex items-center justify-center text-purple-300">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+
+                        <div class="overflow-hidden">
+                            <div
+                                id="p1-name"
+                                class="text-xs text-slate-400 font-semibold truncate"
+                            >
+                                플레이어
+                            </div>
+
+                            <div
+                                id="p1-score"
+                                class="text-xl font-black text-white"
+                            >
+                                0 점
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-card rounded-xl p-3 flex items-center gap-3 border-r-4 border-r-red-500 justify-between">
+                        <div class="overflow-hidden text-right w-full">
+                            <div
+                                id="p2-name"
+                                class="text-xs text-slate-400 font-semibold truncate"
+                            >
+                                상대방
+                            </div>
+
+                            <div
+                                id="p2-score"
+                                class="text-xl font-black text-white"
+                            >
+                                0 점
+                            </div>
+                        </div>
+
+                        <div class="w-10 h-10 shrink-0 rounded-full bg-red-500/30 border border-red-400/50 flex items-center justify-center text-red-300">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-panel rounded-3xl p-3 sm:p-4 flex flex-col items-center justify-center">
+                <div id="phaser-container"></div>
+
+                <p class="mt-3 text-slate-400 text-xs text-center leading-relaxed">
+                    인접한 블록을 차례로 눌러 교환하세요.
+                    <br>
+                    <span class="text-yellow-300 font-bold">
+                        2×2 동일 블록
+                    </span>
+                    이 포함된 연쇄 반응이 끝나면 퀴즈가 발동합니다.
+                </p>
+            </div>
+
+            <p
+                id="timer-guide"
+                class="text-xs text-slate-400 text-center"
+            ></p>
+        </section>
+    </main>
+
+    <!-- 퀴즈 -->
+    <div
+        id="quiz-modal"
+        class="fixed inset-0 bg-black/80 backdrop-blur-md z-40 flex items-center justify-center p-4 hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quiz-question"
+    >
+        <div class="glass-panel bg-slate-900/90 border-2 border-purple-500/50 rounded-3xl p-6 sm:p-8 w-full max-w-lg text-center space-y-6 animate-toast">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-bold">
+                <i class="fa-solid fa-bolt"></i>
+                사칙연산 퀴즈가 발동했습니다!
+            </div>
+
+            <p class="text-sm text-slate-300">
+                올바른 계산 결과를 선택하세요.
+            </p>
+
+            <h2
+                id="quiz-question"
+                class="text-3xl sm:text-4xl font-extrabold text-white"
+            ></h2>
+
+            <div
+                id="quiz-options"
+                class="grid grid-cols-2 gap-3"
+            ></div>
+
+            <p class="text-xs text-slate-400 leading-relaxed">
+                정답을 맞히면
+                <span class="text-green-400 font-bold">
+                    내 점수가 500점 증가
+                </span>
+                하고,
+                <span class="text-red-400 font-bold">
+                    상대방 점수가 500점 감소
+                </span>
+                합니다.
+            </p>
         </div>
     </div>
 
-    <!-- 게임 화면 및 퀴즈 모달 -->
-    <div id="game-container">
-        <div id="quiz-modal">
-            <h3>⚡ 2x2 퀴즈 공격 발동!</h3>
-            <p style="font-size:12px; color:#ffd633; margin-top:-5px;">정답 시 상대방 점수 -300점 차감!</p>
-            <div id="quiz-question">문제 로딩중...</div>
-            <div id="quiz-options"></div>
+    <!-- 결과 -->
+    <div
+        id="result-modal"
+        class="fixed inset-0 bg-black/85 backdrop-blur-lg z-50 flex items-center justify-center p-4 hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="result-title"
+    >
+        <div class="glass-panel bg-slate-900/95 border border-white/20 rounded-3xl p-8 w-full max-w-md text-center space-y-6 animate-toast">
+            <div
+                id="result-badge"
+                class="w-20 h-20 mx-auto rounded-full flex items-center justify-center text-4xl"
+            >
+                🏆
+            </div>
+
+            <div>
+                <h2
+                    id="result-title"
+                    class="text-3xl font-black text-white mb-2"
+                >
+                    VICTORY!
+                </h2>
+
+                <p
+                    id="result-subtitle"
+                    class="text-sm text-slate-300"
+                ></p>
+            </div>
+
+            <div class="glass-card rounded-2xl p-4 grid grid-cols-2 gap-2">
+                <div>
+                    <p class="text-xs text-slate-400 font-semibold">
+                        최종 내 점수입니다.
+                    </p>
+
+                    <p
+                        id="res-my-score"
+                        class="text-2xl font-black text-purple-300"
+                    >
+                        0점
+                    </p>
+                </div>
+
+                <div>
+                    <p class="text-xs text-slate-400 font-semibold">
+                        상대방 점수입니다.
+                    </p>
+
+                    <p
+                        id="res-op-score"
+                        class="text-2xl font-black text-red-400"
+                    >
+                        0점
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex gap-3">
+                <button
+                    type="button"
+                    onclick="returnToLobby()"
+                    class="w-full py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm border border-white/20"
+                >
+                    로비로 이동합니다.
+                </button>
+
+                <button
+                    type="button"
+                    onclick="restartGame()"
+                    class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-sm"
+                >
+                    다시 시작합니다.
+                </button>
+            </div>
         </div>
     </div>
 
-    <script>
-        // 퀴즈 문제 은행 (a: 정답 옵션의 0 기반 인덱스)
-        const QUIZ_BANK = [
-            { q: "7 × 5 은 얼마일까요?", options: ["32", "30", "35", "38"], a: 2 },
-            { q: "5 × 1 은 얼마일까요?", options: ["15", "5", "8", "7"], a: 1 },
-            { q: "8 × 3 은 얼마일까요?", options: ["23", "22", "24", "28"], a: 2 },
-            { q: "4 × 7 은 얼마일까요?", options: ["25", "26", "28", "24"], a: 2 },
-            { q: "3 × 5 은 얼마일까요?", options: ["11", "15", "13", "19"], a: 1 },
-            { q: "6 × 7 은 얼마일까요?", options: ["40", "44", "38", "42"], a: 3 },
-            { q: "8 × 7 은 얼마일까요?", options: ["60", "56", "57", "53"], a: 1 },
-            { q: "6 × 6 은 얼마일까요?", options: ["37", "36", "40", "32"], a: 1 },
-            { q: "4 × 1 은 얼마일까요?", options: ["3", "4", "1", "9"], a: 1 },
-            { q: "9 × 3 은 얼마일까요?", options: ["28", "32", "37", "27"], a: 3 },
-            { q: "5 × 5 은 얼마일까요?", options: ["25", "30", "24", "15"], a: 0 },
-            { q: "3 × 9 은 얼마일까요?", options: ["30", "24", "27", "26"], a: 2 },
-            { q: "7 × 3 은 얼마일까요?", options: ["19", "26", "21", "18"], a: 2 },
-            { q: "3 × 2 은 얼마일까요?", options: ["3", "7", "6", "1"], a: 2 },
-            { q: "2 × 9 은 얼마일까요?", options: ["8", "20", "28", "18"], a: 3 },
-            { q: "5 × 2 은 얼마일까요?", options: ["10", "8", "7", "20"], a: 0 },
-            { q: "9 × 6 은 얼마일까요?", options: ["54", "44", "53", "59"], a: 0 },
-            { q: "2 × 2 은 얼마일까요?", options: ["1", "4", "9", "3"], a: 1 },
-            { q: "4 × 5 은 얼마일까요?", options: ["21", "23", "19", "20"], a: 3 },
-            { q: "8 × 2 은 얼마일까요?", options: ["17", "20", "11", "16"], a: 3 },
-            { q: "8 × 9 은 얼마일까요?", options: ["62", "70", "74", "72"], a: 3 },
-            { q: "4 × 9 은 얼마일까요?", options: ["36", "38", "46", "34"], a: 0 },
-            { q: "5 × 3 은 얼마일까요?", options: ["25", "11", "15", "19"], a: 2 },
-            { q: "7 × 6 은 얼마일까요?", options: ["43", "47", "45", "42"], a: 3 },
-            { q: "7 × 8 은 얼마일까요?", options: ["56", "53", "52", "59"], a: 0 },
-            { q: "6 × 9 은 얼마일까요?", options: ["50", "54", "58", "59"], a: 1 },
-            { q: "2 × 7 은 얼마일까요?", options: ["14", "19", "16", "4"], a: 0 },
-            { q: "6 × 3 은 얼마일까요?", options: ["22", "17", "18", "23"], a: 2 },
-            { q: "8 × 6 은 얼마일까요?", options: ["49", "48", "58", "45"], a: 1 },
-            { q: "8 × 8 은 얼마일까요?", options: ["63", "65", "64", "67"], a: 2 },
-            { q: "9 × 4 은 얼마일까요?", options: ["36", "41", "35", "31"], a: 0 },
-            { q: "5 × 8 은 얼마일까요?", options: ["50", "43", "40", "30"], a: 2 },
-            { q: "5 × 7 은 얼마일까요?", options: ["45", "25", "35", "40"], a: 2 },
-            { q: "7 × 4 은 얼마일까요?", options: ["33", "28", "27", "31"], a: 1 },
-            { q: "6 × 8 은 얼마일까요?", options: ["47", "50", "48", "45"], a: 2 },
-            { q: "9 × 5 은 얼마일까요?", options: ["45", "50", "47", "55"], a: 0 },
-            { q: "5 × 9 은 얼마일까요?", options: ["40", "47", "43", "45"], a: 3 },
-            { q: "3 × 3 은 얼마일까요?", options: ["6", "13", "8", "9"], a: 3 },
-            { q: "5 × 6 은 얼마일까요?", options: ["33", "27", "25", "30"], a: 3 },
-            { q: "이 게임을 만든사람은 누구일까요?", options: ["미리", "기리", "시리", "오리"], a: 3 },
-            { q: "우리나라의 수도는 어디일까요?", options: ["부산", "인천", "서울", "제주"], a: 2 },
-            { q: "1분은 몇 초일까요?", options: ["30초", "50초", "60초", "100초"], a: 2 },
-            { q: "12 + 29 의 값은?", options: ["41", "39", "42", "31"], a: 0 },
-            { q: "임진왜란 때 한산도 대첩을 이끈 장군은?", options: ["강감찬", "이순신", "김유신", "을지문덕"], a: 1 },
-            { q: "삼각형의 내각의 합은 몇 도일까요?", options: ["90도", "180도", "270도", "360도"], a: 1 },
-            { q: "9 × 9 는 얼마일까요?", options: ["72", "81", "90", "89"], a: 1 },
-            { q: "다음 중 태양계에서 가장 큰 행성은?", options: ["지구", "화성", "목성", "토성"], a: 2 },
-            { q: "150 - 60 의 값은?", options: ["80", "90", "100", "70"], a: 1 },
-            { q: "한글을 창제하신 조선의 왕은?", options: ["태종", "세종대왕", "정조", "영조"], a: 1 }
-        ];
+    <script type="module">
+        import {
+            initializeApp
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 
-        // Firebase 설정
-        const firebaseConfig = {
-            apiKey: "AIzaSyDL88cc1AvcAUW0_f8y7fQHkI2bqPB0028",
-            authDomain: "puzzle-siry.firebaseapp.com",
-            databaseURL: "https://puzzle-siry-default-rtdb.firebaseio.com",
-            projectId: "puzzle-siry",
-            storageBucket: "puzzle-siry.firebasestorage.app",
-            messagingSenderId: "786436907175",
-            appId: "1:786436907175:web:6a207f29b484ad6119fb82"
-        };
+        import {
+            getAuth,
+            signInAnonymously,
+            signInWithCustomToken
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
+        import {
+            getFirestore,
+            doc,
+            onSnapshot,
+            collection,
+            getDocs,
+            runTransaction
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        let myNickname = "";
-        let opponentNickname = "상대방";
-        let roomId = "";
-        let playerRole = ""; // 'p1' 또는 'p2'
-        let roomRef = null;
-        let gameScene = null;
+        // =========================================================
+        // 기본 설정
+        // =========================================================
 
-        // --- 1. 실시간 누적 리더보드 로드 ---
-        function loadLeaderboard() {
-            database.ref('leaderboard').orderByChild('wins').limitToLast(10).on('value', (snapshot) => {
-                const listEl = document.getElementById('leaderboard-list');
-                listEl.innerHTML = '';
-
-                const users = [];
-                snapshot.forEach(child => {
-                    users.push(child.val());
-                });
-                users.reverse();
-
-                if (users.length === 0) {
-                    listEl.innerHTML = '<li style="text-align:center; color:#888;">기록이 없습니다.</li>';
-                    return;
-                }
-
-                users.forEach((u, idx) => {
-                    const rankBadge = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
-                    const li = document.createElement('li');
-                    li.innerHTML = `<span>${rankBadge} <b>${u.nickname}</b></span> <span>${u.wins || 0}승 (${u.totalScore || 0}점)</span>`;
-                    listEl.appendChild(li);
-                });
-            });
-        }
-        loadLeaderboard();
-
-        // --- 2. 랜덤 매칭 로직 ---
-        function startMatchmaking() {
-            const nickInput = document.getElementById('nicknameInput').value.trim();
-            if (!nickInput) {
-                alert('닉네임을 입력해주세요!');
-                return;
-            }
-            myNickname = nickInput;
-
-            document.getElementById('lobby').style.display = 'none';
-            document.getElementById('game-container').style.display = 'block';
-
-            const roomsRef = database.ref('rooms');
-            
-            roomsRef.once('value').then((snapshot) => {
-                const rooms = snapshot.val() || {};
-                let foundRoomId = null;
-
-                for (let rId in rooms) {
-                    if (rooms[rId].status === 'waiting' && rooms[rId].p1 && !rooms[rId].p2) {
-                        foundRoomId = rId;
-                        break;
-                    }
-                }
-
-                if (foundRoomId) {
-                    playerRole = 'p2';
-                    roomId = foundRoomId;
-                    roomRef = database.ref('rooms/' + roomId);
-
-                    roomRef.update({
-                        p2: { nickname: myNickname, score: 0 },
-                        status: 'playing'
-                    });
-                } else {
-                    playerRole = 'p1';
-                    roomRef = roomsRef.push();
-                    roomId = roomRef.key;
-
-                    roomRef.set({
-                        p1: { nickname: myNickname, score: 0 },
-                        status: 'waiting'
-                    });
-                }
-
-                roomRef.child(playerRole).onDisconnect().remove();
-                startGame();
-            });
-        }
+        const GAME_DURATION = 45;
+        const QUIZ_REWARD = 500;
+        const QUIZ_DAMAGE = 500;
 
         const GRID_SIZE = 8;
-        const TILE_SIZE = 50;
-        const BOARD_OFFSET_X = 40;
-        const BOARD_OFFSET_Y = 90;
-        const COLORS = [0xff4d4d, 0x4d94ff, 0x4dff88, 0xffd633, 0xcc66ff];
+        const TILE_SIZE = 54;
+        const TILE_TYPES = 5;
 
-        function startGame() {
-            const config = {
-                type: Phaser.AUTO,
-                width: 480,
-                height: 520,
-                backgroundColor: '#2d2d2d',
-                parent: 'game-container',
-                scene: {
-                    preload: preload,
-                    create: create,
-                    update: update
-                }
-            };
-            new Phaser.Game(config);
+        const COLORS = [
+            0xef4444,
+            0x3b82f6,
+            0x10b981,
+            0xf59e0b,
+            0xa855f7
+        ];
+
+        /*
+         * 독립적으로 배포하는 경우 아래 값에 실제 Firebase 설정을
+         * 입력하세요. 주입된 __firebase_config가 있으면 그 값을
+         * 우선 사용합니다.
+         *
+         * Firebase 설정이 없으면 AI 모드만 사용합니다.
+         */
+        const LOCAL_FIREBASE_CONFIG = null;
+
+        /*
+        const LOCAL_FIREBASE_CONFIG = {
+            apiKey: "실제 API 키",
+            authDomain: "프로젝트.firebaseapp.com",
+            projectId: "프로젝트 ID",
+            storageBucket: "프로젝트.firebasestorage.app",
+            messagingSenderId: "실제 값",
+            appId: "실제 앱 ID"
+        };
+        */
+
+        const appId =
+            typeof __app_id !== "undefined"
+                ? __app_id
+                : "quiz-match3-v3";
+
+        const state = {
+            appId,
+            db: null,
+            auth: null,
+
+            userId: "user_" + Math.random().toString(36).slice(2, 11),
+            nickname: "플레이어_" + randomInt(1000, 9999),
+
+            firebaseReady: false,
+            initialized: false,
+
+            roomId: null,
+            matchId: null,
+            isHost: false,
+            isAI: false,
+
+            myScore: 0,
+            opScore: 0,
+            opName: "상대방",
+
+            isGameActive: false,
+            isQuizActive: false,
+            matchStarted: false,
+            isEnding: false,
+            isMatching: false,
+
+            gameTimer: GAME_DURATION,
+            deadline: null,
+
+            timerInterval: null,
+            aiInterval: null,
+            unsubscribeRoom: null,
+
+            lastAttackHandled: 0,
+            session: 0,
+
+            scoreQueue: Promise.resolve()
+        };
+
+        window.appState = state;
+        window.phaserGame = null;
+
+        // =========================================================
+        // 공통 유틸리티
+        // =========================================================
+
+        function $(id) {
+            return document.getElementById(id);
         }
 
-        function preload() {}
+        function randomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
 
-        function create() {
-            gameScene = this;
-            this.selectedTile = null;
-            this.canMove = false;
-            this.score = 0;
-            this.opponentScore = 0;
-            this.timeLeft = 20; // ⏱️ 게임 시간을 20초로 설정
-            this.isGameOver = false;
-            this.isGameStarted = false;
-            this.isQuizActive = false;
+        function shuffleArray(array) {
+            const result = [...array];
 
-            this.add.text(BOARD_OFFSET_X, 10, `[나: ${myNickname}]`, { fontSize: '14px', color: '#4d94ff', fontStyle: 'bold' });
-            this.timerText = this.add.text(BOARD_OFFSET_X + 220, 10, '⏱ 남은 시간: 20초', { fontSize: '15px', color: '#ffd633', fontStyle: 'bold' });
+            for (let i = result.length - 1; i > 0; i--) {
+                const j = randomInt(0, i);
+                [result[i], result[j]] = [result[j], result[i]];
+            }
 
-            this.myScoreText = this.add.text(BOARD_OFFSET_X, 35, '내 점수: 0', { fontSize: '18px', color: '#ffffff', fontStyle: 'bold' });
-            this.opponentScoreText = this.add.text(BOARD_OFFSET_X + 220, 35, '상대 점수: 대기중', { fontSize: '18px', color: '#ff4d4d', fontStyle: 'bold' });
+            return result;
+        }
 
-            COLORS.forEach((color, index) => {
-                let g = this.add.graphics();
-                g.fillStyle(color, 1);
-                g.fillRoundedRect(0, 0, TILE_SIZE - 4, TILE_SIZE - 4, 10);
-                g.generateTexture('tile_' + index, TILE_SIZE - 4, TILE_SIZE - 4);
-                g.destroy();
-            });
+        function showToast(message, type = "info") {
+            const toast = document.createElement("div");
 
-            this.board = [];
-            for (let row = 0; row < GRID_SIZE; row++) {
-                this.board[row] = [];
-                for (let col = 0; col < GRID_SIZE; col++) {
-                    let colorIndex = getValidColorIndex.call(this, row, col);
-                    let tile = createTile.call(this, row, col, colorIndex);
-                    this.board[row][col] = tile;
+            const colorClass =
+                type === "danger"
+                    ? "bg-red-600/95 border-red-400"
+                    : type === "success"
+                        ? "bg-emerald-600/95 border-emerald-400"
+                        : "bg-purple-600/95 border-purple-400";
+
+            toast.className =
+                colorClass +
+                " text-white px-4 py-3 rounded-2xl border " +
+                "text-xs sm:text-sm font-bold animate-toast";
+
+            // 외부 문자열을 HTML로 삽입하지 않습니다.
+            toast.textContent = message;
+
+            $("toast-container").appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = "0";
+                toast.style.transition = "opacity 0.3s ease";
+
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 3000);
+        }
+
+        function renderScores() {
+            $("p1-score").textContent = `${state.myScore} 점`;
+            $("p2-score").textContent = `${state.opScore} 점`;
+        }
+
+        function renderTimer() {
+            const seconds = Math.max(0, state.gameTimer);
+
+            $("game-timer").textContent = seconds;
+
+            $("timer-progress").style.width =
+                `${(seconds / GAME_DURATION) * 100}%`;
+        }
+
+        function readNickname() {
+            const nickname = $("player-nickname").value.trim();
+
+            if (nickname) {
+                state.nickname = nickname.slice(0, 10);
+            }
+        }
+
+        function setMatchButtons(matching) {
+            $("btn-find-match").disabled = matching;
+            $("btn-ai-match").disabled = matching;
+
+            $("btn-find-match").innerHTML = matching
+                ? '<i class="fa-solid fa-spinner fa-spin"></i> 상대방을 찾고 있습니다.'
+                : '<i class="fa-solid fa-gamepad"></i> 실시간 대전을 시작합니다.';
+
+            $("btn-cancel-match").classList.toggle(
+                "hidden",
+                !matching
+            );
+        }
+
+        function getRoomRef(roomId = state.roomId) {
+            return doc(
+                state.db,
+                "artifacts",
+                state.appId,
+                "public",
+                "data",
+                "rooms",
+                roomId
+            );
+        }
+
+        function clearTimers() {
+            if (state.timerInterval) {
+                clearInterval(state.timerInterval);
+                state.timerInterval = null;
+            }
+
+            if (state.aiInterval) {
+                clearInterval(state.aiInterval);
+                state.aiInterval = null;
+            }
+        }
+
+        function stopRoomListener() {
+            if (state.unsubscribeRoom) {
+                state.unsubscribeRoom();
+                state.unsubscribeRoom = null;
+            }
+        }
+
+        function destroyPhaserGame() {
+            if (window.phaserGame) {
+                window.phaserGame.destroy(true);
+                window.phaserGame = null;
+            }
+
+            $("phaser-container").replaceChildren();
+        }
+
+        function resetSession() {
+            clearTimers();
+            stopRoomListener();
+            destroyPhaserGame();
+
+            state.session++;
+
+            state.roomId = null;
+            state.matchId = null;
+            state.isHost = false;
+            state.isAI = false;
+
+            state.myScore = 0;
+            state.opScore = 0;
+            state.opName = "相手";
+
+            state.isGameActive = false;
+            state.isQuizActive = false;
+            state.matchStarted = false;
+            state.isEnding = false;
+            state.isMatching = false;
+
+            state.gameTimer = GAME_DURATION;
+            state.deadline = null;
+
+            state.lastAttackHandled = 0;
+            state.scoreQueue = Promise.resolve();
+
+            $("quiz-modal").classList.add("hidden");
+            $("result-modal").classList.add("hidden");
+            $("damage-overlay").classList.add("hidden");
+        }
+
+        // =========================================================
+        // Firebase 초기화
+        // =========================================================
+
+        async function initializeFirebase() {
+            try {
+                let firebaseConfig = LOCAL_FIREBASE_CONFIG;
+
+                if (typeof __firebase_config !== "undefined") {
+                    firebaseConfig =
+                        typeof __firebase_config === "string"
+                            ? JSON.parse(__firebase_config)
+                            : __firebase_config;
+                }
+
+                if (!firebaseConfig) {
+                    throw new Error("Firebase 설정이 없습니다.");
+                }
+
+                const app = initializeApp(firebaseConfig);
+
+                state.db = getFirestore(app);
+                state.auth = getAuth(app);
+
+                const token =
+                    typeof __initial_auth_token !== "undefined"
+                        ? __initial_auth_token
+                        : null;
+
+                if (token) {
+                    await signInWithCustomToken(state.auth, token);
+                } else {
+                    await signInAnonymously(state.auth);
+                }
+
+                if (!state.auth.currentUser) {
+                    throw new Error("사용자 인증에 실패했습니다.");
+                }
+
+                state.userId = state.auth.currentUser.uid;
+                state.firebaseReady = true;
+
+                $("connection-status").textContent =
+                    "온라인 대전을 사용할 수 있습니다.";
+            } catch (error) {
+                console.warn("AI 모드로 초기화합니다.", error);
+
+                state.firebaseReady = false;
+
+                $("connection-status").textContent =
+                    "온라인 연결이 없어 AI 연습 모드로 동작합니다.";
+            } finally {
+                state.initialized = true;
+
+                setMatchButtons(false);
+                fetchLeaderboard();
+            }
+        }
+
+        // =========================================================
+        // 명예의 전당
+        // =========================================================
+
+        async function fetchLeaderboard() {
+            const list = $("leaderboard-list");
+            list.replaceChildren();
+
+            if (!state.firebaseReady) {
+                const message = document.createElement("p");
+
+                message.className =
+                    "text-center py-3 text-xs text-slate-400";
+
+                message.textContent =
+                    "온라인 연결 후 실제 순위 정보를 확인할 수 있습니다.";
+
+                list.appendChild(message);
+                return;
+            }
+
+            try {
+                const reference = collection(
+                    state.db,
+                    "artifacts",
+                    state.appId,
+                    "public",
+                    "data",
+                    "leaderboard"
+                );
+
+                const snapshot = await getDocs(reference);
+
+                const players = snapshot.docs.map((item) => item.data());
+
+                players.sort((a, b) => {
+                    return (
+                        (b.wins || 0) - (a.wins || 0) ||
+                        (b.score || 0) - (a.score || 0)
+                    );
+                });
+
+                if (players.length === 0) {
+                    const message = document.createElement("p");
+
+                    message.className =
+                        "text-center py-3 text-xs text-slate-400";
+
+                    message.textContent =
+                        "등록된 순위 정보가 없습니다.";
+
+                    list.appendChild(message);
+                    return;
+                }
+
+                players.slice(0, 5).forEach((player, index) => {
+                    const row = document.createElement("div");
+
+                    row.className =
+                        "flex items-center justify-between gap-3 " +
+                        "py-2 px-2 rounded-lg bg-white/5 text-xs";
+
+                    const name = document.createElement("span");
+                    name.className = "font-bold text-slate-200";
+
+                    name.textContent =
+                        `${index + 1}. ${player.nickname || "익명"}`;
+
+                    const score = document.createElement("span");
+                    score.className =
+                        "text-purple-300 font-semibold shrink-0";
+
+                    score.textContent =
+                        `${player.wins || 0}승 (${player.score || 0}점)`;
+
+                    row.append(name, score);
+                    list.appendChild(row);
+                });
+            } catch (error) {
+                console.error("순위 조회 오류:", error);
+
+                const message = document.createElement("p");
+                message.className =
+                    "text-center py-3 text-xs text-slate-400";
+
+                message.textContent =
+                    "순위 정보를 불러오지 못했습니다.";
+
+                list.appendChild(message);
+            }
+        }
+
+        async function saveLeaderboard() {
+            if (
+                !state.firebaseReady ||
+                state.isAI ||
+                state.myScore <= state.opScore ||
+                !state.matchId
+            ) {
+                return;
+            }
+
+            const userId = state.userId;
+            const nickname = state.nickname;
+            const score = state.myScore;
+            const matchId = state.matchId;
+
+            const playerRef = doc(
+                state.db,
+                "artifacts",
+                state.appId,
+                "public",
+                "data",
+                "leaderboard",
+                userId
+            );
+
+            // 같은 경기의 승리 기록이 중복 저장되지 않도록 합니다.
+            const recordRef = doc(
+                state.db,
+                "artifacts",
+                state.appId,
+                "public",
+                "data",
+                "matchResults",
+                `${matchId}_${userId}`
+            );
+
+            try {
+                await runTransaction(state.db, async (transaction) => {
+                    const recordSnapshot = await transaction.get(recordRef);
+
+                    if (recordSnapshot.exists()) {
+                        return;
+                    }
+
+                    const playerSnapshot = await transaction.get(playerRef);
+
+                    const previous = playerSnapshot.exists()
+                        ? playerSnapshot.data()
+                        : {};
+
+                    transaction.set(playerRef, {
+                        userId,
+                        nickname,
+                        wins: (previous.wins || 0) + 1,
+                        score: playerSnapshot.exists()
+                            ? Math.max(previous.score ?? score, score)
+                            : score,
+                        updatedAt: Date.now()
+                    });
+
+                    transaction.set(recordRef, {
+                        userId,
+                        matchId,
+                        score,
+                        createdAt: Date.now()
+                    });
+                });
+            } catch (error) {
+                console.error("승리 기록 저장 오류:", error);
+
+                showToast(
+                    "승리 기록을 저장하지 못했습니다.",
+                    "danger"
+                );
+            }
+        }
+
+        // =========================================================
+        // 게임 시작 및 UI
+        // =========================================================
+
+        function setupGameUI() {
+            state.isGameActive = true;
+            state.isQuizActive = false;
+            state.matchStarted = true;
+            state.isEnding = false;
+            state.isMatching = false;
+
+            $("lobby-screen").classList.add("hidden");
+
+            $("game-screen").classList.remove("hidden");
+            $("game-screen").classList.add("flex");
+
+            $("result-modal").classList.add("hidden");
+            $("quiz-modal").classList.add("hidden");
+
+            $("p1-name").textContent = `${state.nickname} (나)`;
+            $("p2-name").textContent = state.opName;
+
+            $("match-status-tag").textContent = state.isAI
+                ? "AI 연습 모드입니다."
+                : "실시간 대전 중입니다.";
+
+            $("timer-guide").textContent = state.isAI
+                ? "AI 연습 모드에서는 퀴즈를 푸는 동안 시간이 멈춥니다."
+                : "온라인 대전에서는 두 플레이어의 공통 종료 시간을 사용하며, 퀴즈 중에도 시간이 흐릅니다.";
+
+            renderScores();
+            renderTimer();
+
+            setMatchButtons(false);
+        }
+
+        function startAIMatch() {
+            if (
+                !state.initialized ||
+                state.isGameActive ||
+                state.isMatching
+            ) {
+                return;
+            }
+
+            readNickname();
+            resetSession();
+
+            state.isAI = true;
+            state.isHost = true;
+            state.opName = "AI 봇 (연습)";
+
+            setupGameUI();
+            initPhaserGame();
+            startTimer();
+            startAIBehavior();
+        }
+
+        function startAIBehavior() {
+            if (state.aiInterval) {
+                clearInterval(state.aiInterval);
+            }
+
+            state.aiInterval = setInterval(() => {
+                if (!state.isGameActive || state.isQuizActive) {
+                    return;
+                }
+
+                if (Math.random() < 0.3) {
+                    state.opScore += 100;
+                }
+
+                if (Math.random() < 0.12) {
+                    // 음수 점수를 허용하여 정확히 500점을 차감합니다.
+                    state.myScore -= QUIZ_DAMAGE;
+                    triggerVisualHitEffect();
+                }
+
+                renderScores();
+            }, 3000);
+        }
+
+        // =========================================================
+        // 온라인 매칭
+        // =========================================================
+
+        async function startMatchmaking() {
+            if (
+                !state.initialized ||
+                state.isGameActive ||
+                state.isMatching
+            ) {
+                return;
+            }
+
+            readNickname();
+
+            if (!state.firebaseReady) {
+                showToast(
+                    "온라인 연결이 없어 AI 대전으로 전환합니다."
+                );
+
+                startAIMatch();
+                return;
+            }
+
+            resetSession();
+
+            state.isMatching = true;
+            state.roomId = "global_room";
+
+            setMatchButtons(true);
+
+            const session = state.session;
+            const roomRef = getRoomRef();
+
+            try {
+                const result = await runTransaction(
+                    state.db,
+                    async (transaction) => {
+                        const snapshot = await transaction.get(roomRef);
+                        const room = snapshot.exists()
+                            ? snapshot.data()
+                            : null;
+
+                        const now = Date.now();
+
+                        const waitingExpired =
+                            room?.status === "waiting" &&
+                            now - (room.createdAt || 0) > 120000;
+
+                        const playingExpired =
+                            room?.status === "playing" &&
+                            now > (room.endAt || Infinity) + 10000;
+
+                        if (
+                            !room ||
+                            room.status === "finished" ||
+                            waitingExpired ||
+                            playingExpired
+                        ) {
+                            const matchId =
+                                `${now}_${Math.random()
+                                    .toString(36)
+                                    .slice(2, 10)}`;
+
+                            transaction.set(roomRef, {
+                                matchId,
+
+                                p1: {
+                                    id: state.userId,
+                                    name: state.nickname,
+                                    score: 0,
+                                    attackCount: 0
+                                },
+
+                                p2: null,
+                                status: "waiting",
+                                createdAt: now,
+                                endAt: null
+                            });
+
+                            return {
+                                isHost: true,
+                                matchId
+                            };
+                        }
+
+                        if (
+                            room.status === "waiting" &&
+                            room.p1.id !== state.userId
+                        ) {
+                            transaction.update(roomRef, {
+                                p2: {
+                                    id: state.userId,
+                                    name: state.nickname,
+                                    score: 0,
+                                    attackCount: 0
+                                },
+
+                                status: "playing",
+                                startAt: now,
+                                endAt: now + GAME_DURATION * 1000
+                            });
+
+                            return {
+                                isHost: false,
+                                matchId: room.matchId
+                            };
+                        }
+
+                        if (
+                            room.status === "waiting" &&
+                            room.p1.id === state.userId
+                        ) {
+                            return {
+                                isHost: true,
+                                matchId: room.matchId
+                            };
+                        }
+
+                        throw new Error(
+                            "現在ほかの対戦が進行中です。"
+                        );
+                    }
+                );
+
+                if (session !== state.session) {
+                    return;
+                }
+
+                state.isHost = result.isHost;
+                state.matchId = result.matchId;
+
+                state.unsubscribeRoom = onSnapshot(
+                    roomRef,
+
+                    (snapshot) => {
+                        if (
+                            session !== state.session ||
+                            !snapshot.exists()
+                        ) {
+                            return;
+                        }
+
+                        const room = snapshot.data();
+
+                        if (room.matchId !== state.matchId) {
+                            return;
+                        }
+
+                        const myPlayer = state.isHost
+                            ? room.p1
+                            : room.p2;
+
+                        const opponent = state.isHost
+                            ? room.p2
+                            : room.p1;
+
+                        if (
+                            room.status === "playing" &&
+                            !state.matchStarted
+                        ) {
+                            state.opName =
+                                opponent?.name || "상대방";
+
+                            state.deadline = room.endAt;
+
+                            setupGameUI();
+                            initPhaserGame();
+                            startTimer();
+                        }
+
+                        if (myPlayer) {
+                            state.myScore = myPlayer.score ?? 0;
+                        }
+
+                        if (opponent) {
+                            state.opScore = opponent.score ?? 0;
+                            state.opName = opponent.name || "상대방";
+
+                            $("p2-name").textContent = state.opName;
+
+                            const attackCount =
+                                opponent.attackCount || 0;
+
+                            if (
+                                state.isGameActive &&
+                                attackCount > state.lastAttackHandled
+                            ) {
+                                // 점수 차감은 이미 서버 트랜잭션에서
+                                // 처리되었으므로 여기서는 효과만 표시합니다.
+                                triggerVisualHitEffect();
+                            }
+
+                            state.lastAttackHandled = attackCount;
+                        }
+
+                        renderScores();
+
+                        if (
+                            room.status === "finished" &&
+                            state.matchStarted &&
+                            !state.isEnding
+                        ) {
+                            endGame(true);
+                        } else if (
+                            room.status === "finished" &&
+                            !state.matchStarted
+                        ) {
+                            cancelMatchmaking();
+                        }
+                    },
+
+                    (error) => {
+                        console.error("경기 구독 오류:", error);
+
+                        showToast(
+                            "온라인 경기 정보를 받지 못했습니다.",
+                            "danger"
+                        );
+
+                        if (state.isMatching) {
+                            resetSession();
+                            setMatchButtons(false);
+                        }
+                    }
+                );
+            } catch (error) {
+                console.error("매칭 오류:", error);
+
+                if (session !== state.session) {
+                    return;
+                }
+
+                resetSession();
+                setMatchButtons(false);
+
+                showToast(
+                    "매칭할 수 없습니다. 잠시 후 다시 시도하거나 AI 모드를 이용하세요.",
+                    "danger"
+                );
+            }
+        }
+
+        async function cancelMatchmaking() {
+            if (!state.isMatching) {
+                return;
+            }
+
+            const roomRef = state.roomId ? getRoomRef() : null;
+            const matchId = state.matchId;
+            const isHost = state.isHost;
+
+            resetSession();
+            setMatchButtons(false);
+
+            if (roomRef && matchId && isHost) {
+                try {
+                    await runTransaction(
+                        state.db,
+                        async (transaction) => {
+                            const snapshot =
+                                await transaction.get(roomRef);
+
+                            if (!snapshot.exists()) {
+                                return;
+                            }
+
+                            const room = snapshot.data();
+
+                            if (
+                                room.matchId === matchId &&
+                                room.status === "waiting" &&
+                                room.p1.id === state.userId
+                            ) {
+                                transaction.update(roomRef, {
+                                    status: "finished"
+                                });
+                            }
+                        }
+                    );
+                } catch (error) {
+                    console.error("매칭 취소 오류:", error);
+                }
+            }
+        }
+
+        // =========================================================
+        // 점수 반영
+        // =========================================================
+
+        function applyScoreChange(gainedScore, quizAttack = false) {
+            if (!state.isGameActive) {
+                return Promise.resolve();
+            }
+
+            if (state.isAI) {
+                state.myScore += gainedScore;
+
+                if (quizAttack) {
+                    state.opScore -= QUIZ_DAMAGE;
+                }
+
+                renderScores();
+                return Promise.resolve();
+            }
+
+            const session = state.session;
+            const roomRef = getRoomRef();
+            const matchId = state.matchId;
+
+            const myKey = state.isHost ? "p1" : "p2";
+            const opponentKey = state.isHost ? "p2" : "p1";
+
+            // 45초 종료 전에 발생한 점수 요청만 접수합니다.
+            const submittedAt = Date.now();
+
+            state.scoreQueue = state.scoreQueue
+                .then(async () => {
+                    if (session !== state.session) {
+                        return;
+                    }
+
+                    await runTransaction(
+                        state.db,
+                        async (transaction) => {
+                            const snapshot =
+                                await transaction.get(roomRef);
+
+                            if (!snapshot.exists()) {
+                                return;
+                            }
+
+                            const room = snapshot.data();
+
+                            if (
+                                room.matchId !== matchId ||
+                                room.status !== "playing" ||
+                                submittedAt >= room.endAt
+                            ) {
+                                return;
+                            }
+
+                            const me = room[myKey];
+                            const opponent = room[opponentKey];
+
+                            if (
+                                !me ||
+                                me.id !== state.userId ||
+                                !opponent
+                            ) {
+                                return;
+                            }
+
+                            const updates = {
+                                [`${myKey}.score`]:
+                                    (me.score ?? 0) + gainedScore
+                            };
+
+                            if (quizAttack) {
+                                // 정답 보상과 상대방 차감을
+                                // 하나의 트랜잭션으로 반영합니다.
+                                updates[`${opponentKey}.score`] =
+                                    (opponent.score ?? 0) -
+                                    QUIZ_DAMAGE;
+
+                                updates[`${myKey}.attackCount`] =
+                                    (me.attackCount || 0) + 1;
+                            }
+
+                            transaction.update(roomRef, updates);
+                        }
+                    );
+                })
+                .catch((error) => {
+                    console.error("점수 반영 오류:", error);
+
+                    if (session === state.session) {
+                        showToast(
+                            "온라인 점수를 반영하지 못했습니다.",
+                            "danger"
+                        );
+                    }
+                });
+
+            return state.scoreQueue;
+        }
+
+        // =========================================================
+        // 시간
+        // =========================================================
+
+        function startTimer() {
+            if (state.timerInterval) {
+                clearInterval(state.timerInterval);
+            }
+
+            renderTimer();
+
+            if (state.isAI) {
+                state.timerInterval = setInterval(() => {
+                    if (
+                        !state.isGameActive ||
+                        state.isQuizActive
+                    ) {
+                        return;
+                    }
+
+                    state.gameTimer--;
+                    renderTimer();
+
+                    if (state.gameTimer <= 0) {
+                        endGame();
+                    }
+                }, 1000);
+
+                return;
+            }
+
+            const tick = () => {
+                if (!state.isGameActive) {
+                    return;
+                }
+
+                state.gameTimer = Math.max(
+                    0,
+                    Math.ceil((state.deadline - Date.now()) / 1000)
+                );
+
+                renderTimer();
+
+                if (state.gameTimer <= 0) {
+                    endGame();
+                }
+            };
+
+            state.timerInterval = setInterval(tick, 200);
+            tick();
+        }
+
+        // =========================================================
+        // 사칙연산 문제
+        // =========================================================
+
+        function createArithmeticQuiz() {
+            const operators = ["+", "−", "×", "÷"];
+            const operator = operators[randomInt(0, 3)];
+
+            let a;
+            let b;
+            let correctAnswer;
+
+            switch (operator) {
+                case "+":
+                    a = randomInt(1, 50);
+                    b = randomInt(1, 50);
+                    correctAnswer = a + b;
+                    break;
+
+                case "−":
+                    a = randomInt(1, 50);
+                    b = randomInt(1, a);
+                    correctAnswer = a - b;
+                    break;
+
+                case "×":
+                    a = randomInt(2, 12);
+                    b = randomInt(2, 12);
+                    correctAnswer = a * b;
+                    break;
+
+                case "÷":
+                    // 나눗셈의 정답은 항상 정수입니다.
+                    b = randomInt(2, 12);
+                    correctAnswer = randomInt(1, 12);
+                    a = b * correctAnswer;
+                    break;
+            }
+
+            const choices = new Set([correctAnswer]);
+
+            while (choices.size < 4) {
+                const candidate =
+                    correctAnswer + randomInt(-12, 12);
+
+                if (
+                    candidate >= 0 &&
+                    candidate !== correctAnswer
+                ) {
+                    choices.add(candidate);
                 }
             }
 
-            this.waitingOverlay = this.add.graphics();
-            this.waitingOverlay.fillStyle(0x000000, 0.85);
-            this.waitingOverlay.fillRect(0, 0, 480, 520);
-            this.waitingOverlay.setDepth(10);
+            const options = shuffleArray([...choices]);
 
-            this.waitingText = this.add.text(240, 240, `🔍 매칭 상대 찾는 중...`, {
-                fontSize: '22px', color: '#ffffff', align: 'center', fontStyle: 'bold'
-            }).setOrigin(0.5).setDepth(11);
+            return {
+                question: `${a} ${operator} ${b} = ?`,
+                options,
+                answerIndex: options.indexOf(correctAnswer),
+                correctAnswer
+            };
+        }
 
-            roomRef.on('value', (snapshot) => {
-                const data = snapshot.val() || {};
+        function triggerQuizModal() {
+            if (
+                !state.isGameActive ||
+                state.isQuizActive
+            ) {
+                return;
+            }
 
-                let opponentRole = playerRole === 'p1' ? 'p2' : 'p1';
-                if (data[opponentRole]) {
-                    opponentNickname = data[opponentRole].nickname || "상대방";
-                    if (data[opponentRole].score !== undefined) {
-                        this.opponentScore = data[opponentRole].score;
-                        this.opponentScoreText.setText(`${opponentNickname}: ${this.opponentScore}`);
+            state.isQuizActive = true;
+
+            const quiz = createArithmeticQuiz();
+            const session = state.session;
+            const container = $("quiz-options");
+
+            $("quiz-question").textContent = quiz.question;
+            container.replaceChildren();
+
+            let answered = false;
+
+            quiz.options.forEach((option, index) => {
+                const button = document.createElement("button");
+
+                button.type = "button";
+
+                button.className =
+                    "w-full py-4 px-3 rounded-xl bg-white/10 " +
+                    "hover:bg-purple-600/50 border border-white/20 " +
+                    "text-white font-bold text-xl transition " +
+                    "active:scale-95";
+
+                button.textContent = option;
+
+                button.addEventListener("click", () => {
+                    if (
+                        answered ||
+                        !state.isGameActive ||
+                        session !== state.session
+                    ) {
+                        return;
                     }
+
+                    // 온라인에서는 종료 시각 이후 답안을 받지 않습니다.
+                    if (
+                        !state.isAI &&
+                        Date.now() >= state.deadline
+                    ) {
+                        endGame();
+                        return;
+                    }
+
+                    answered = true;
+
+                    container
+                        .querySelectorAll("button")
+                        .forEach((item) => {
+                            item.disabled = true;
+                        });
+
+                    if (index === quiz.answerIndex) {
+                        applyScoreChange(QUIZ_REWARD, true);
+
+                        showToast(
+                            "정답입니다! 내 점수 +500점, 상대방 점수 -500점!",
+                            "success"
+                        );
+                    } else {
+                        showToast(
+                            `오답입니다. 정답은 ${quiz.correctAnswer}입니다.`,
+                            "danger"
+                        );
+                    }
+
+                    $("quiz-modal").classList.add("hidden");
+                    state.isQuizActive = false;
+                });
+
+                container.appendChild(button);
+            });
+
+            $("quiz-modal").classList.remove("hidden");
+
+            container.querySelector("button")?.focus();
+        }
+
+        // =========================================================
+        // 피격 효과
+        // =========================================================
+
+        function triggerVisualHitEffect() {
+            const overlay = $("damage-overlay");
+
+            overlay.classList.remove("hidden");
+            overlay.classList.remove("animate-damage");
+
+            void overlay.offsetWidth;
+
+            overlay.classList.add("animate-damage");
+
+            setTimeout(() => {
+                overlay.classList.add("hidden");
+            }, 450);
+
+            const scene =
+                window.phaserGame?.scene?.scenes?.[0];
+
+            if (scene?.cameras?.main) {
+                scene.cameras.main.shake(300, 0.02);
+            }
+
+            showToast(
+                "상대방의 퀴즈 공격으로 500점이 차감되었습니다!",
+                "danger"
+            );
+        }
+
+        // =========================================================
+        // 종료 및 재시작
+        // =========================================================
+
+        async function endGame(roomAlreadyFinished = false) {
+            if (
+                state.isEnding ||
+                !state.matchStarted
+            ) {
+                return;
+            }
+
+            state.isEnding = true;
+            state.isGameActive = false;
+            state.isQuizActive = false;
+
+            clearTimers();
+            $("quiz-modal").classList.add("hidden");
+
+            const session = state.session;
+
+            if (!state.isAI && state.roomId) {
+                try {
+                    // 이미 접수된 내 점수 요청을 먼저 처리합니다.
+                    await state.scoreQueue;
+
+                    const roomRef = getRoomRef();
+                    const matchId = state.matchId;
+
+                    const finalRoom = await runTransaction(
+                        state.db,
+                        async (transaction) => {
+                            const snapshot =
+                                await transaction.get(roomRef);
+
+                            if (!snapshot.exists()) {
+                                return null;
+                            }
+
+                            const room = snapshot.data();
+
+                            if (room.matchId !== matchId) {
+                                return null;
+                            }
+
+                            if (
+                                room.status === "playing" &&
+                                !roomAlreadyFinished &&
+                                Date.now() >= room.endAt
+                            ) {
+                                transaction.update(roomRef, {
+                                    status: "finished",
+                                    finishedAt: Date.now()
+                                });
+                            }
+
+                            return room;
+                        }
+                    );
+
+                    if (session !== state.session) {
+                        return;
+                    }
+
+                    if (finalRoom) {
+                        const me = state.isHost
+                            ? finalRoom.p1
+                            : finalRoom.p2;
+
+                        const opponent = state.isHost
+                            ? finalRoom.p2
+                            : finalRoom.p1;
+
+                        state.myScore = me?.score ?? 0;
+                        state.opScore = opponent?.score ?? 0;
+                    }
+                } catch (error) {
+                    console.error("경기 종료 동기화 오류:", error);
+
+                    showToast(
+                        "최종 점수를 서버와 동기화하지 못했습니다.",
+                        "danger"
+                    );
                 }
+            }
 
-                if (data.status === 'playing' && !this.isGameStarted) {
-                    this.isGameStarted = true;
-                    this.canMove = true;
+            if (session !== state.session) {
+                return;
+            }
 
-                    if (this.waitingOverlay) this.waitingOverlay.destroy();
-                    if (this.waitingText) this.waitingText.destroy();
+            stopRoomListener();
+            renderScores();
+            showResult();
 
-                    this.timeEvent = this.time.addEvent({
-                        delay: 1000,
-                        callback: onTimerTick,
-                        callbackScope: this,
-                        loop: true
+            await saveLeaderboard();
+        }
+
+        function showResult() {
+            const my = state.myScore;
+            const opponent = state.opScore;
+
+            $("res-my-score").textContent = `${my}점`;
+            $("res-op-score").textContent = `${opponent}점`;
+
+            const badge = $("result-badge");
+            const title = $("result-title");
+            const subtitle = $("result-subtitle");
+
+            badge.className =
+                "w-20 h-20 mx-auto rounded-full flex items-center " +
+                "justify-center text-4xl border-2";
+
+            if (my > opponent) {
+                badge.classList.add(
+                    "bg-yellow-500/30",
+                    "border-yellow-400"
+                );
+
+                badge.textContent = "🏆";
+
+                title.textContent = "VICTORY!";
+                title.className =
+                    "text-3xl font-black text-yellow-300 mb-2";
+
+                subtitle.textContent =
+                    "퍼즐과 사칙연산 퀴즈로 승리를 쟁취했습니다!";
+            } else if (my < opponent) {
+                badge.classList.add(
+                    "bg-red-500/30",
+                    "border-red-400"
+                );
+
+                badge.textContent = "💀";
+
+                title.textContent = "DEFEAT";
+                title.className =
+                    "text-3xl font-black text-red-400 mb-2";
+
+                subtitle.textContent =
+                    "다시 도전하여 상대방의 점수를 넘어서세요.";
+            } else {
+                badge.classList.add(
+                    "bg-slate-500/30",
+                    "border-slate-400"
+                );
+
+                badge.textContent = "🤝";
+
+                title.textContent = "DRAW";
+                title.className =
+                    "text-3xl font-black text-slate-200 mb-2";
+
+                subtitle.textContent =
+                    "치열한 대전 끝에 무승부를 기록했습니다.";
+            }
+
+            $("result-modal").classList.remove("hidden");
+        }
+
+        function returnToLobby() {
+            resetSession();
+
+            $("game-screen").classList.add("hidden");
+            $("game-screen").classList.remove("flex");
+
+            $("lobby-screen").classList.remove("hidden");
+
+            setMatchButtons(false);
+            fetchLeaderboard();
+        }
+
+        function restartGame() {
+            const wasAI = state.isAI;
+
+            returnToLobby();
+
+            if (wasAI) {
+                startAIMatch();
+            } else {
+                // 온라인 경기는 새 상대 매칭부터 다시 시작합니다.
+                startMatchmaking();
+            }
+        }
+
+        // =========================================================
+        // Phaser 초기화
+        // =========================================================
+
+        function initPhaserGame() {
+            destroyPhaserGame();
+
+            if (typeof Phaser === "undefined") {
+                state.isGameActive = false;
+
+                showToast(
+                    "게임 엔진을 불러오지 못했습니다. 페이지를 새로고침하세요.",
+                    "danger"
+                );
+
+                return;
+            }
+
+            window.phaserGame = new Phaser.Game({
+                type: Phaser.AUTO,
+
+                width: GRID_SIZE * TILE_SIZE,
+                height: GRID_SIZE * TILE_SIZE,
+
+                parent: "phaser-container",
+                transparent: true,
+
+                scale: {
+                    mode: Phaser.Scale.FIT,
+                    autoCenter: Phaser.Scale.CENTER_BOTH
+                },
+
+                scene: {
+                    preload: phaserPreload,
+                    create: phaserCreate
+                }
+            });
+        }
+
+        function phaserPreload() {
+            COLORS.forEach((color, index) => {
+                const graphics = this.add.graphics();
+
+                graphics.fillStyle(color, 1);
+
+                graphics.fillRoundedRect(
+                    2,
+                    2,
+                    TILE_SIZE - 4,
+                    TILE_SIZE - 4,
+                    12
+                );
+
+                graphics.lineStyle(2, 0xffffff, 0.4);
+
+                graphics.strokeRoundedRect(
+                    4,
+                    4,
+                    TILE_SIZE - 8,
+                    TILE_SIZE - 8,
+                    10
+                );
+
+                graphics.fillStyle(0xffffff, 0.3);
+                graphics.fillCircle(14, 14, 5);
+
+                graphics.generateTexture(
+                    `tile_${index}`,
+                    TILE_SIZE,
+                    TILE_SIZE
+                );
+
+                graphics.destroy();
+            });
+
+            const selection = this.add.graphics();
+
+            selection.lineStyle(4, 0xffff00, 1);
+
+            selection.strokeRoundedRect(
+                2,
+                2,
+                TILE_SIZE - 4,
+                TILE_SIZE - 4,
+                12
+            );
+
+            selection.generateTexture(
+                "selection",
+                TILE_SIZE,
+                TILE_SIZE
+            );
+
+            selection.destroy();
+        }
+
+        function createTile(scene, row, col, type, startY) {
+            const sprite = scene.add.sprite(
+                col * TILE_SIZE,
+                startY ?? row * TILE_SIZE,
+                `tile_${type}`
+            );
+
+            sprite.setOrigin(0);
+            sprite.setInteractive();
+
+            sprite.row = row;
+            sprite.col = col;
+            sprite.tileType = type;
+
+            sprite.on("pointerdown", () => {
+                onTileClick(scene, sprite);
+            });
+
+            return sprite;
+        }
+
+        function phaserCreate() {
+            const scene = this;
+
+            scene.board = [];
+            scene.selectedTile = null;
+            scene.isBusy = false;
+
+            // 연쇄 반응 전체에서 2×2 발생 여부를 누적합니다.
+            scene.pendingQuiz = false;
+
+            const background = scene.add.graphics();
+            background.fillStyle(0x000000, 0.3);
+
+            for (let row = 0; row < GRID_SIZE; row++) {
+                for (let col = 0; col < GRID_SIZE; col++) {
+                    background.fillRoundedRect(
+                        col * TILE_SIZE + 2,
+                        row * TILE_SIZE + 2,
+                        TILE_SIZE - 4,
+                        TILE_SIZE - 4,
+                        10
+                    );
+                }
+            }
+
+            scene.selectionSprite = scene.add.sprite(
+                -100,
+                -100,
+                "selection"
+            );
+
+            scene.selectionSprite
+                .setOrigin(0)
+                .setDepth(10)
+                .setVisible(false);
+
+            for (let row = 0; row < GRID_SIZE; row++) {
+                scene.board[row] = [];
+
+                for (let col = 0; col < GRID_SIZE; col++) {
+                    let type;
+
+                    // 초기 보드에는 3매치와 2×2 매치가 없도록 합니다.
+                    do {
+                        type = randomInt(0, TILE_TYPES - 1);
+                    } while (
+                        (
+                            col >= 2 &&
+                            scene.board[row][col - 1].tileType === type &&
+                            scene.board[row][col - 2].tileType === type
+                        ) ||
+                        (
+                            row >= 2 &&
+                            scene.board[row - 1][col].tileType === type &&
+                            scene.board[row - 2][col].tileType === type
+                        ) ||
+                        (
+                            row >= 1 &&
+                            col >= 1 &&
+                            scene.board[row][col - 1].tileType === type &&
+                            scene.board[row - 1][col].tileType === type &&
+                            scene.board[row - 1][col - 1].tileType === type
+                        )
+                    );
+
+                    scene.board[row][col] = createTile(
+                        scene,
+                        row,
+                        col,
+                        type
+                    );
+                }
+            }
+        }
+
+        // =========================================================
+        // 블록 선택 및 교환
+        // =========================================================
+
+        function onTileClick(scene, tile) {
+            if (
+                scene.isBusy ||
+                !state.isGameActive ||
+                state.isQuizActive
+            ) {
+                return;
+            }
+
+            if (!scene.selectedTile) {
+                scene.selectedTile = tile;
+
+                scene.selectionSprite
+                    .setPosition(
+                        tile.col * TILE_SIZE,
+                        tile.row * TILE_SIZE
+                    )
+                    .setVisible(true);
+
+                return;
+            }
+
+            const previous = scene.selectedTile;
+
+            scene.selectedTile = null;
+            scene.selectionSprite.setVisible(false);
+
+            if (previous === tile) {
+                return;
+            }
+
+            const adjacent =
+                Math.abs(previous.row - tile.row) +
+                Math.abs(previous.col - tile.col) === 1;
+
+            if (adjacent) {
+                scene.pendingQuiz = false;
+                swapTiles(scene, previous, tile);
+            } else {
+                scene.selectedTile = tile;
+
+                scene.selectionSprite
+                    .setPosition(
+                        tile.col * TILE_SIZE,
+                        tile.row * TILE_SIZE
+                    )
+                    .setVisible(true);
+            }
+        }
+
+        function swapTiles(scene, first, second) {
+            scene.isBusy = true;
+
+            const row1 = first.row;
+            const col1 = first.col;
+
+            const row2 = second.row;
+            const col2 = second.col;
+
+            scene.board[row1][col1] = second;
+            scene.board[row2][col2] = first;
+
+            first.row = row2;
+            first.col = col2;
+
+            second.row = row1;
+            second.col = col1;
+
+            scene.tweens.add({
+                targets: first,
+                x: col2 * TILE_SIZE,
+                y: row2 * TILE_SIZE,
+                duration: 200
+            });
+
+            scene.tweens.add({
+                targets: second,
+                x: col1 * TILE_SIZE,
+                y: row1 * TILE_SIZE,
+                duration: 200,
+
+                onComplete: () => {
+                    const matches = checkBoardMatches(scene);
+
+                    if (matches.matchedTiles.length > 0) {
+                        processMatches(scene, matches);
+                        return;
+                    }
+
+                    // 매치가 없으면 원래 위치로 복구합니다.
+                    scene.board[row1][col1] = first;
+                    scene.board[row2][col2] = second;
+
+                    first.row = row1;
+                    first.col = col1;
+
+                    second.row = row2;
+                    second.col = col2;
+
+                    scene.tweens.add({
+                        targets: first,
+                        x: col1 * TILE_SIZE,
+                        y: row1 * TILE_SIZE,
+                        duration: 200
+                    });
+
+                    scene.tweens.add({
+                        targets: second,
+                        x: col2 * TILE_SIZE,
+                        y: row2 * TILE_SIZE,
+                        duration: 200,
+
+                        onComplete: () => {
+                            scene.isBusy = false;
+                        }
                     });
                 }
             });
         }
 
-        function onTimerTick() {
-            if (this.isGameOver || this.isQuizActive) return; // 퀴즈 푸는 중에는 타이머 멈춤
+        // =========================================================
+        // 3매치 및 2×2 검사
+        // =========================================================
 
-            this.timeLeft--;
-            this.timerText.setText(`⏱️ 남은 시간: ${this.timeLeft}초`);
-
-            if (this.timeLeft <= 0) {
-                this.timeEvent.remove();
-                showGameOverScreen.call(this);
-            }
-        }
-
-        // --- 퀴즈 공격 모달 실행 (PC & 모바일 터치 완전 지원) ---
-        function triggerQuizAttack() {
-            gameScene.isQuizActive = true;
-            gameScene.canMove = false;
-
-            const modal = document.getElementById('quiz-modal');
-            const qEl = document.getElementById('quiz-question');
-            const optsEl = document.getElementById('quiz-options');
-
-            const quiz = QUIZ_BANK[Math.floor(Math.random() * QUIZ_BANK.length)];
-
-            qEl.innerText = quiz.q;
-            optsEl.innerHTML = '';
-
-            quiz.options.forEach((optText, idx) => {
-                const btn = document.createElement('button');
-                btn.className = 'quiz-option-btn';
-                btn.innerText = `${idx + 1}. ${optText}`;
-
-                // 모바일 터치와 PC 클릭 중복 처리 방지 플래그
-                let isAnswered = false;
-
-                const handleAnswer = (e) => {
-                    if (e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                    }
-                    if (isAnswered) return;
-                    isAnswered = true;
-
-                    modal.style.display = 'none';
-                    gameScene.isQuizActive = false;
-
-                    if (idx === quiz.a) {
-                        // 정답! 보상 및 상대방 공격
-                        gameScene.score += 200;
-                        gameScene.myScoreText.setText('내 점수: ' + gameScene.score);
-
-                        // 상대방 점수 차감 요청 (최하 0점)
-                        let opponentRole = playerRole === 'p1' ? 'p2' : 'p1';
-                        roomRef.child(opponentRole + '/score').transaction((curr) => {
-                            let newScore = (curr || 0) - 300;
-                            return newScore < 0 ? 0 : newScore;
-                        });
-
-                        roomRef.child(playerRole).update({ score: gameScene.score });
-                        showToast("🎯 정답! 상대방 점수 -300점 차감!");
-                    } else {
-                        showToast("❌ 오답! 공격 실패!");
-                    }
-
-                    if (!gameScene.isGameOver && gameScene.isGameStarted) gameScene.canMove = true;
-                };
-
-                // 모바일 pointerdown과 일반 클릭 이벤트 모두 바인딩
-                btn.addEventListener('pointerdown', handleAnswer);
-                btn.onclick = handleAnswer;
-
-                optsEl.appendChild(btn);
-            });
-
-            modal.style.display = 'block';
-        }
-
-        function showToast(msg) {
-            let toast = gameScene.add.text(240, 260, msg, {
-                fontSize: '20px', color: '#ffd633', backgroundColor: '#000000', padding: { x: 15, y: 10 }
-            }).setOrigin(0.5).setDepth(30);
-
-            gameScene.tweens.add({
-                targets: toast,
-                y: 200,
-                alpha: 0,
-                duration: 1500,
-                onComplete: () => toast.destroy()
-            });
-        }
-
-        function showGameOverScreen() {
-            this.isGameOver = true;
-            this.canMove = false;
-
-            document.getElementById('quiz-modal').style.display = 'none';
-
-            let overlay = this.add.graphics();
-            overlay.fillStyle(0x000000, 0.88);
-            overlay.fillRect(0, 0, 480, 520);
-            overlay.setDepth(20);
-
-            let isWin = this.score > this.opponentScore;
-            let resultMessage = isWin ? "🏆 승리했습니다! 🏆" : (this.score < this.opponentScore ? "📢 패배했습니다..." : "🤝 무승부입니다!");
-            let resultColor = isWin ? "#4dff88" : (this.score < this.opponentScore ? "#ff4d4d" : "#ffd633");
-
-            saveLeaderboardResult(myNickname, this.score, isWin);
-
-            this.add.text(240, 150, '20초 대결 종료', { fontSize: '26px', color: '#aaaaaa' }).setOrigin(0.5).setDepth(21);
-            this.add.text(240, 210, resultMessage, { fontSize: '32px', color: resultColor, fontStyle: 'bold' }).setOrigin(0.5).setDepth(21);
-            this.add.text(240, 280, `내 점수 (${myNickname}): ${this.score}점`, { fontSize: '18px', color: '#ffffff' }).setOrigin(0.5).setDepth(21);
-            this.add.text(240, 310, `상대 점수 (${opponentNickname}): ${this.opponentScore}점`, { fontSize: '18px', color: '#ffaaaa' }).setOrigin(0.5).setDepth(21);
-
-            let restartBtn = this.add.text(240, 380, '🔄 다시 매칭하기', {
-                fontSize: '20px', color: '#ffffff', backgroundColor: '#4d94ff', padding: { x: 20, y: 10 }
-            }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(21);
-
-            restartBtn.on('pointerdown', () => {
-                location.reload();
-            });
-        }
-
-        function saveLeaderboardResult(nickname, finalScore, isWin) {
-            const safeKey = nickname.replace(/[.#$\[\]/]/g, "_");
-            const userRef = database.ref('leaderboard/' + safeKey);
-
-            userRef.transaction((currentData) => {
-                if (!currentData) {
-                    return { nickname: nickname, wins: isWin ? 1 : 0, totalScore: finalScore, games: 1 };
-                } else {
-                    return {
-                        nickname: nickname,
-                        wins: (currentData.wins || 0) + (isWin ? 1 : 0),
-                        totalScore: (currentData.totalScore || 0) + finalScore,
-                        games: (currentData.games || 0) + 1
-                    };
-                }
-            });
-        }
-
-        function getValidColorIndex(row, col) {
-            let validColors = [];
-            for (let i = 0; i < COLORS.length; i++) {
-                let left1 = (col >= 1 && this.board[row][col - 1]) ? this.board[row][col - 1].colorIndex : -1;
-                let left2 = (col >= 2 && this.board[row][col - 2]) ? this.board[row][col - 2].colorIndex : -1;
-                let up1 = (row >= 1 && this.board[row - 1][col]) ? this.board[row - 1][col].colorIndex : -1;
-                let up2 = (row >= 2 && this.board[row - 2][col]) ? this.board[row - 2][col].colorIndex : -1;
-                let upLeft = (row >= 1 && col >= 1 && this.board[row - 1][col - 1]) ? this.board[row - 1][col - 1].colorIndex : -1;
-
-                if (i === left1 && i === left2) continue;
-                if (i === up1 && i === up2) continue;
-                if (i === left1 && i === up1 && i === upLeft) continue;
-
-                validColors.push(i);
-            }
-            return validColors[Phaser.Math.Between(0, validColors.length - 1)];
-        }
-
-        function createTile(row, col, colorIndex) {
-            if (colorIndex === undefined) {
-                colorIndex = Phaser.Math.Between(0, COLORS.length - 1);
-            }
-            let x = BOARD_OFFSET_X + col * TILE_SIZE + TILE_SIZE / 2;
-            let y = BOARD_OFFSET_Y + row * TILE_SIZE + TILE_SIZE / 2;
-
-            let tile = this.add.image(x, y, 'tile_' + colorIndex);
-            tile.colorIndex = colorIndex;
-            tile.row = row;
-            tile.col = col;
-
-            tile.setInteractive();
-            tile.on('pointerdown', () => selectTile.call(this, tile));
-
-            return tile;
-        }
-
-        function selectTile(tile) {
-            if (!this.canMove || this.isGameOver || !this.isGameStarted || this.isQuizActive) return;
-
-            if (!this.selectedTile) {
-                this.selectedTile = tile;
-                tile.setAlpha(0.5);
-            } else {
-                if (this.selectedTile === tile) {
-                    this.selectedTile.setAlpha(1);
-                    this.selectedTile = null;
-                    return;
-                }
-
-                let isAdjacent = (Math.abs(this.selectedTile.row - tile.row) + Math.abs(this.selectedTile.col - tile.col)) === 1;
-
-                if (isAdjacent) {
-                    swapTiles.call(this, this.selectedTile, tile, true);
-                } else {
-                    this.selectedTile.setAlpha(1);
-                    this.selectedTile = tile;
-                    tile.setAlpha(0.5);
-                }
-            }
-        }
-
-        function swapTiles(tile1, tile2, checkMatchAfterSwap) {
-            this.canMove = false;
-            tile1.setAlpha(1);
-
-            this.board[tile1.row][tile1.col] = tile2;
-            this.board[tile2.row][tile2.col] = tile1;
-
-            let tempRow = tile1.row;
-            let tempCol = tile1.col;
-            tile1.row = tile2.row;
-            tile1.col = tile2.col;
-            tile2.row = tempRow;
-            tile2.col = tempCol;
-
-            let x1 = BOARD_OFFSET_X + tile1.col * TILE_SIZE + TILE_SIZE / 2;
-            let y1 = BOARD_OFFSET_Y + tile1.row * TILE_SIZE + TILE_SIZE / 2;
-            let x2 = BOARD_OFFSET_X + tile2.col * TILE_SIZE + TILE_SIZE / 2;
-            let y2 = BOARD_OFFSET_Y + tile2.row * TILE_SIZE + TILE_SIZE / 2;
-
-            this.tweens.add({ targets: tile1, x: x1, y: y1, duration: 200 });
-            this.tweens.add({
-                targets: tile2,
-                x: x2,
-                y: y2,
-                duration: 200,
-                onComplete: () => {
-                    this.selectedTile = null;
-
-                    if (checkMatchAfterSwap) {
-                        let matchResult = checkMatches.call(this);
-                        if (matchResult.matches.length > 0) {
-                            processMatches.call(this, matchResult);
-                        } else {
-                            swapTiles.call(this, tile1, tile2, false);
-                        }
-                    } else {
-                        if (!this.isGameOver && this.isGameStarted && !this.isQuizActive) this.canMove = true;
-                    }
-                }
-            });
-        }
-
-        function checkMatches() {
-            let matchedTiles = new Set();
+        function checkBoardMatches(scene) {
+            const matchedTiles = new Set();
             let has2x2 = false;
 
-            // 1. 일직선 3개 이상 체크
             for (let row = 0; row < GRID_SIZE; row++) {
-                for (let col = 0; col < GRID_SIZE - 2; col++) {
-                    let t1 = this.board[row][col];
-                    let t2 = this.board[row][col + 1];
-                    let t3 = this.board[row][col + 2];
-                    if (t1 && t2 && t3 && t1.colorIndex === t2.colorIndex && t2.colorIndex === t3.colorIndex) {
-                        matchedTiles.add(t1); matchedTiles.add(t2); matchedTiles.add(t3);
+                for (let col = 0; col < GRID_SIZE; col++) {
+                    const current = scene.board[row][col];
+
+                    if (!current) {
+                        continue;
+                    }
+
+                    // 가로 3개 이상입니다.
+                    if (col <= GRID_SIZE - 3) {
+                        const next1 = scene.board[row][col + 1];
+                        const next2 = scene.board[row][col + 2];
+
+                        if (
+                            next1 &&
+                            next2 &&
+                            current.tileType === next1.tileType &&
+                            current.tileType === next2.tileType
+                        ) {
+                            matchedTiles.add(current);
+                            matchedTiles.add(next1);
+                            matchedTiles.add(next2);
+                        }
+                    }
+
+                    // 세로 3개 이상입니다.
+                    if (row <= GRID_SIZE - 3) {
+                        const next1 = scene.board[row + 1][col];
+                        const next2 = scene.board[row + 2][col];
+
+                        if (
+                            next1 &&
+                            next2 &&
+                            current.tileType === next1.tileType &&
+                            current.tileType === next2.tileType
+                        ) {
+                            matchedTiles.add(current);
+                            matchedTiles.add(next1);
+                            matchedTiles.add(next2);
+                        }
+                    }
+
+                    // 동일한 색의 2×2 블록입니다.
+                    if (
+                        row <= GRID_SIZE - 2 &&
+                        col <= GRID_SIZE - 2
+                    ) {
+                        const topLeft = current;
+                        const topRight = scene.board[row][col + 1];
+                        const bottomLeft = scene.board[row + 1][col];
+                        const bottomRight =
+                            scene.board[row + 1][col + 1];
+
+                        if (
+                            topRight &&
+                            bottomLeft &&
+                            bottomRight &&
+                            topLeft.tileType === topRight.tileType &&
+                            topLeft.tileType === bottomLeft.tileType &&
+                            topLeft.tileType === bottomRight.tileType
+                        ) {
+                            matchedTiles.add(topLeft);
+                            matchedTiles.add(topRight);
+                            matchedTiles.add(bottomLeft);
+                            matchedTiles.add(bottomRight);
+
+                            has2x2 = true;
+                        }
                     }
                 }
             }
 
-            for (let col = 0; col < GRID_SIZE; col++) {
-                for (let row = 0; row < GRID_SIZE - 2; row++) {
-                    let t1 = this.board[row][col];
-                    let t2 = this.board[row + 1][col];
-                    let t3 = this.board[row + 2][col];
-                    if (t1 && t2 && t3 && t1.colorIndex === t2.colorIndex && t2.colorIndex === t3.colorIndex) {
-                        matchedTiles.add(t1); matchedTiles.add(t2); matchedTiles.add(t3);
-                    }
-                }
-            }
-
-            // 2. 2x2 형태 체크 (퀴즈 공격 발동 조건)
-            for (let row = 0; row < GRID_SIZE - 1; row++) {
-                for (let col = 0; col < GRID_SIZE - 1; col++) {
-                    let t1 = this.board[row][col];
-                    let t2 = this.board[row][col + 1];
-                    let t3 = this.board[row + 1][col];
-                    let t4 = this.board[row + 1][col + 1];
-                    if (t1 && t2 && t3 && t4 && t1.colorIndex === t2.colorIndex && t1.colorIndex === t3.colorIndex && t1.colorIndex === t4.colorIndex) {
-                        matchedTiles.add(t1); matchedTiles.add(t2); matchedTiles.add(t3); matchedTiles.add(t4);
-                        has2x2 = true;
-                    }
-                }
-            }
-
-            return { matches: Array.from(matchedTiles), has2x2: has2x2 };
+            return {
+                matchedTiles: [...matchedTiles],
+                has2x2
+            };
         }
 
-        function processMatches(matchResult) {
-            let matches = matchResult.matches;
-            this.score += matches.length * 100;
-            this.myScoreText.setText('내 점수: ' + this.score);
+        // =========================================================
+        // 연쇄 반응 및 퀴즈 예약
+        // =========================================================
 
-            if (roomRef && playerRole) {
-                roomRef.child(playerRole).update({ score: this.score });
+        function processMatches(scene, { matchedTiles, has2x2 }) {
+            if (!state.isGameActive) {
+                scene.isBusy = false;
+                scene.pendingQuiz = false;
+                return;
             }
 
-            // 2x2 매치 감지 시 퀴즈 공격 발동!
-            if (matchResult.has2x2) {
-                setTimeout(() => triggerQuizAttack(), 300);
-            }
+            // 이전 단계에서 발생한 2×2 조건을 유지합니다.
+            scene.pendingQuiz =
+                Boolean(scene.pendingQuiz || has2x2);
 
-            this.tweens.add({
-                targets: matches,
+            // 블록 제거 점수는 기존처럼 블록당 20점입니다.
+            applyScoreChange(matchedTiles.length * 20);
+
+            scene.tweens.add({
+                targets: matchedTiles,
                 scaleX: 0,
                 scaleY: 0,
                 alpha: 0,
                 duration: 250,
+
                 onComplete: () => {
-                    matches.forEach(tile => {
-                        this.board[tile.row][tile.col] = null;
+                    matchedTiles.forEach((tile) => {
+                        scene.board[tile.row][tile.col] = null;
                         tile.destroy();
                     });
 
-                    dropAndRefill.call(this);
+                    dropAndRefill(scene, () => {
+                        if (!state.isGameActive) {
+                            scene.isBusy = false;
+                            scene.pendingQuiz = false;
+                            return;
+                        }
+
+                        const nextMatches = checkBoardMatches(scene);
+
+                        if (nextMatches.matchedTiles.length > 0) {
+                            processMatches(scene, nextMatches);
+                            return;
+                        }
+
+                        // 연쇄 반응이 모두 끝난 시점입니다.
+                        scene.isBusy = false;
+
+                        const shouldTriggerQuiz =
+                            scene.pendingQuiz;
+
+                        scene.pendingQuiz = false;
+
+                        // 같은 연쇄 안에서 여러 개의 2×2가 발생해도
+                        // 퀴즈는 한 번만 발동합니다.
+                        if (shouldTriggerQuiz) {
+                            triggerQuizModal();
+                        }
+                    });
                 }
             });
         }
 
-        function dropAndRefill() {
-            let dropTweens = [];
+        // =========================================================
+        // 낙하 및 새 블록 생성
+        // =========================================================
+
+        function dropAndRefill(scene, onComplete) {
+            const animations = [];
 
             for (let col = 0; col < GRID_SIZE; col++) {
-                let emptySpaces = 0;
+                let writeRow = GRID_SIZE - 1;
 
-                for (let row = GRID_SIZE - 1; row >= 0; row--) {
-                    if (this.board[row][col] === null) {
-                        emptySpaces++;
-                    } else if (emptySpaces > 0) {
-                        let tile = this.board[row][col];
-                        let targetRow = row + emptySpaces;
+                // 기존 블록을 아래부터 모읍니다.
+                for (
+                    let readRow = GRID_SIZE - 1;
+                    readRow >= 0;
+                    readRow--
+                ) {
+                    const tile = scene.board[readRow][col];
 
-                        this.board[targetRow][col] = tile;
-                        this.board[row][col] = null;
-                        tile.row = targetRow;
-
-                        let targetY = BOARD_OFFSET_Y + targetRow * TILE_SIZE + TILE_SIZE / 2;
-                        dropTweens.push({ targets: tile, y: targetY, duration: 300 });
+                    if (!tile) {
+                        continue;
                     }
+
+                    if (writeRow !== readRow) {
+                        scene.board[writeRow][col] = tile;
+                        scene.board[readRow][col] = null;
+
+                        tile.row = writeRow;
+
+                        animations.push({
+                            tile,
+                            targetY: writeRow * TILE_SIZE,
+                            duration:
+                                200 + (writeRow - readRow) * 50
+                        });
+                    }
+
+                    writeRow--;
                 }
 
-                for (let i = 0; i < emptySpaces; i++) {
-                    let targetRow = emptySpaces - 1 - i;
-                    let tile = createTile.call(this, targetRow, col);
+                const emptyCount = writeRow + 1;
 
-                    let targetY = BOARD_OFFSET_Y + targetRow * TILE_SIZE + TILE_SIZE / 2;
-                    tile.y = BOARD_OFFSET_Y - (i + 1) * TILE_SIZE;
+                // 상단의 빈칸에 새 블록을 생성합니다.
+                for (let row = 0; row < emptyCount; row++) {
+                    const type = randomInt(0, TILE_TYPES - 1);
 
-                    this.board[targetRow][col] = tile;
-                    dropTweens.push({ targets: tile, y: targetY, duration: 300 });
-                }
-            }
+                    const startY =
+                        (row - emptyCount) * TILE_SIZE;
 
-            if (dropTweens.length > 0) {
-                dropTweens.forEach((t, idx) => {
-                    this.tweens.add({
-                        ...t,
-                        onComplete: idx === dropTweens.length - 1 ? () => {
-                            let nextResult = checkMatches.call(this);
-                            if (nextResult.matches.length > 0) {
-                                processMatches.call(this, nextResult);
-                            } else {
-                                if (!this.isGameOver && this.isGameStarted && !this.isQuizActive) this.canMove = true;
-                            }
-                        } : null
+                    const tile = createTile(
+                        scene,
+                        row,
+                        col,
+                        type,
+                        startY
+                    );
+
+                    scene.board[row][col] = tile;
+
+                    animations.push({
+                        tile,
+                        targetY: row * TILE_SIZE,
+                        duration: 300 + emptyCount * 30
                     });
-                });
-            } else {
-                if (!this.isGameOver && this.isGameStarted && !this.isQuizActive) this.canMove = true;
+                }
             }
+
+            if (animations.length === 0) {
+                onComplete();
+                return;
+            }
+
+            // 고정 지연 시간이 아니라 실제 모든 낙하가 끝난 뒤
+            // 다음 연쇄 반응을 검사합니다.
+            let remaining = animations.length;
+
+            animations.forEach((animation) => {
+                scene.tweens.add({
+                    targets: animation.tile,
+                    y: animation.targetY,
+                    duration: animation.duration,
+                    ease: "Quad.easeOut",
+
+                    onComplete: () => {
+                        remaining--;
+
+                        if (remaining === 0) {
+                            onComplete();
+                        }
+                    }
+                });
+            });
         }
 
-        function update() {}
+        // =========================================================
+        // HTML onclick 핸들러 연결
+        // =========================================================
+
+        Object.assign(window, {
+            startAIMatch,
+            startMatchmaking,
+            cancelMatchmaking,
+            returnToLobby,
+            restartGame,
+            fetchLeaderboard
+        });
+
+        initializeFirebase();
     </script>
 </body>
 </html>
