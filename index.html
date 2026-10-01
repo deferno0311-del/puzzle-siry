@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>실시간 퀴즈 공격 30초 퍼즐 대전</title>
+    <title>실시간 퀴즈 공격 10초 퍼즐 대전</title>
     <!-- Phaser 3 게임 엔진 -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.0/dist/phaser.min.js"></script>
     <!-- Firebase SDK (Compat 버전) -->
@@ -199,7 +199,7 @@
             { q: "5 × 9 은 얼마일까요?", options: ["40", "47", "43", "45"], a: 3 },
             { q: "3 × 3 은 얼마일까요?", options: ["6", "13", "8", "9"], a: 3 },
             { q: "5 × 6 은 얼마일까요?", options: ["33", "27", "25", "30"], a: 3 },
-            { q: "9 × 1 은 얼마일까요?", options: ["8", "10", "19", "9"], a: 3 },
+            { q: "이 게임을 만든사람은 누구일까요?", options: ["미리", "기리", "시리", "오리"], a: 3 },
             { q: "우리나라의 수도는 어디일까요?", options: ["부산", "인천", "서울", "제주"], a: 2 },
             { q: "1분은 몇 초일까요?", options: ["30초", "50초", "60초", "100초"], a: 2 },
             { q: "12 + 29 의 값은?", options: ["41", "39", "42", "31"], a: 0 },
@@ -339,13 +339,13 @@
             this.canMove = false;
             this.score = 0;
             this.opponentScore = 0;
-            this.timeLeft = 30;
+            this.timeLeft = 10; // ⏱️ 게임 시간을 10초로 설정
             this.isGameOver = false;
             this.isGameStarted = false;
             this.isQuizActive = false;
 
             this.add.text(BOARD_OFFSET_X, 10, `[나: ${myNickname}]`, { fontSize: '14px', color: '#4d94ff', fontStyle: 'bold' });
-            this.timerText = this.add.text(BOARD_OFFSET_X + 220, 10, '⏱ 남은 시간: 30초', { fontSize: '15px', color: '#ffd633', fontStyle: 'bold' });
+            this.timerText = this.add.text(BOARD_OFFSET_X + 220, 10, '⏱ 남은 시간: 10초', { fontSize: '15px', color: '#ffd633', fontStyle: 'bold' });
 
             this.myScoreText = this.add.text(BOARD_OFFSET_X, 35, '내 점수: 0', { fontSize: '18px', color: '#ffffff', fontStyle: 'bold' });
             this.opponentScoreText = this.add.text(BOARD_OFFSET_X + 220, 35, '상대 점수: 대기중', { fontSize: '18px', color: '#ff4d4d', fontStyle: 'bold' });
@@ -497,7 +497,7 @@
 
             saveLeaderboardResult(myNickname, this.score, isWin);
 
-            this.add.text(240, 150, '30초 대결 종료', { fontSize: '26px', color: '#aaaaaa' }).setOrigin(0.5).setDepth(21);
+            this.add.text(240, 150, '10초 대결 종료', { fontSize: '26px', color: '#aaaaaa' }).setOrigin(0.5).setDepth(21);
             this.add.text(240, 210, resultMessage, { fontSize: '32px', color: resultColor, fontStyle: 'bold' }).setOrigin(0.5).setDepth(21);
             this.add.text(240, 280, `내 점수 (${myNickname}): ${this.score}점`, { fontSize: '18px', color: '#ffffff' }).setOrigin(0.5).setDepth(21);
             this.add.text(240, 310, `상대 점수 (${opponentNickname}): ${this.opponentScore}점`, { fontSize: '18px', color: '#ffaaaa' }).setOrigin(0.5).setDepth(21);
