@@ -946,12 +946,12 @@
             first.col = col2;
             second.row = row1;
             second.col = col1;
-            scene.tweens.add({ targets: first, x: col2 * TILE_SIZE, y: row2 * TILE_SIZE, duration: 200 });
+            scene.tweens.add({ targets: first, x: col2 * TILE_SIZE, y: row2 * TILE_SIZE, duration: 80 });
             scene.tweens.add({
                 targets: second,
                 x: col1 * TILE_SIZE,
                 y: row1 * TILE_SIZE,
-                duration: 200,
+                duration: 80,
                 onComplete: () => {
                     const matches = checkBoardMatches(scene);
                     if (matches.matchedTiles.length > 0) {
@@ -964,12 +964,12 @@
                     first.col = col1;
                     second.row = row2;
                     second.col = col2;
-                    scene.tweens.add({ targets: first, x: col1 * TILE_SIZE, y: row1 * TILE_SIZE, duration: 200 });
+                    scene.tweens.add({ targets: first, x: col1 * TILE_SIZE, y: row1 * TILE_SIZE, duration: 80 });
                     scene.tweens.add({
                         targets: second,
                         x: col2 * TILE_SIZE,
                         y: row2 * TILE_SIZE,
-                        duration: 200,
+                        duration: 80,
                         onComplete: () => { scene.isBusy = false; }
                     });
                 }
@@ -1034,7 +1034,7 @@
                 scaleX: 0,
                 scaleY: 0,
                 alpha: 0,
-                duration: 250,
+                duration: 100,
                 onComplete: () => {
                     matchedTiles.forEach((tile) => {
                         scene.board[tile.row][tile.col] = null;
@@ -1072,7 +1072,7 @@
                         scene.board[writeRow][col] = tile;
                         scene.board[readRow][col] = null;
                         tile.row = writeRow;
-                        animations.push({ tile, targetY: writeRow * TILE_SIZE, duration: 200 + (writeRow - readRow) * 50 });
+                        animations.push({ tile, targetY: writeRow * TILE_SIZE, duration: 80 + (writeRow - readRow) * 20 });
                     }
                     writeRow--;
                 }
@@ -1082,7 +1082,7 @@
                     const startY = (row - emptyCount) * TILE_SIZE;
                     const tile = createTile(scene, row, col, type, startY);
                     scene.board[row][col] = tile;
-                    animations.push({ tile, targetY: row * TILE_SIZE, duration: 300 + emptyCount * 30 });
+                    animations.push({ tile, targetY: row * TILE_SIZE, duration: 120 + emptyCount * 15 });
                 }
             }
             if (animations.length === 0) {
