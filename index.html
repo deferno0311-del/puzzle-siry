@@ -70,8 +70,8 @@
                     <span class="text-yellow-300 font-bold">2×2 동일 블록</span>이 포함된 반응이 발생하면 사칙연산 퀴즈가 발동합니다.
                 </p>
                 <p class="text-sm leading-relaxed">
-                    정답을 맞히면 <span class="text-green-400 font-bold">내 점수 +500점</span>과
-                    <span class="text-red-400 font-bold">상대방 점수 -500점</span>이 적용됩니다.
+                    정답을 맞히면 <span class="text-green-400 font-bold">내 점수 +275점</span>과
+                    <span class="text-red-400 font-bold">상대방 점수 -275점</span>이 적용됩니다.
                 </p>
                 <p class="text-xs text-slate-400 mt-2">점수는 음수가 될 수 있습니다.</p>
             </div>
@@ -130,7 +130,7 @@
             <p class="text-sm text-slate-300">올바른 계산 결과를 선택하세요.</p>
             <h2 id="quiz-question" class="text-3xl sm:text-4xl font-extrabold text-white"></h2>
             <div id="quiz-options" class="grid grid-cols-2 gap-3"></div>
-            <p class="text-xs text-slate-400 leading-relaxed">정답을 맞히면 <span class="text-green-400 font-bold">내 점수가 500점 증가</span>하고, <span class="text-red-400 font-bold">상대방 점수가 500점 감소</span>합니다.</p>
+            <p class="text-xs text-slate-400 leading-relaxed">정답을 맞히면 <span class="text-green-400 font-bold">내 점수가 275점 증가</span>하고, <span class="text-red-400 font-bold">상대방 점수가 275점 감소</span>합니다.</p>
         </div>
     </div>
     <div id="result-modal" class="fixed inset-0 bg-black/85 backdrop-blur-lg z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="result-title">
@@ -154,8 +154,8 @@
         import { getFirestore, doc, onSnapshot, collection, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const GAME_DURATION = 45;
-        const QUIZ_REWARD = 500;
-        const QUIZ_DAMAGE = 500;
+        const QUIZ_REWARD = 275;
+        const QUIZ_DAMAGE = 275;
         const GRID_SIZE = 8;
         const TILE_SIZE = 54;
         const TILE_TYPES = 5;
