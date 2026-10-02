@@ -472,104 +472,396 @@
             }, 3000);
         }
 
-        // 온라인 매칭: 기존과 같이 하나의 공용 방을 사용합니다.
-        async function startMatchmaking() {
-            if (!state.initialized || state.isGameActive || state.isMatching) return;
-            readNickname();
-            if (!state.firebaseReady) {
-                showToast("온라인 연결이 없어 AI 대전으로 전환합니다.");
-                startAIMatch();
-                return;
-            }
-            resetSession();
-            state.isMatching = true;
-            state.roomId = "global_room";
-            setMatchButtons(true);
-            const session = state.session;
-            const roomRef = getRoomRef();
-            try {
-                const result = await runTransaction(state.db, async (transaction) => {
-                    const snapshot = await transaction.get(roomRef);
-                    const room = snapshot.exists() ? snapshot.data() : null;
-                    const now = Date.now();
-                    const waitingExpired = room?.status === "waiting" && now - (room.createdAt || 0) > 120000;
-                    const playingExpired = room?.status === "playing" && now > (room.endAt || Infinity) + 10000;
-                    if (!room || room.status === "finished" || waitingExpired || playingExpired) {
-                        const matchId = `${now}_${Math.random().toString(36).slice(2, 10)}`;
-                        transaction.set(roomRef, {
-                            matchId,
-                            p1: { id: state.userId, name: state.nickname, score: 0, attackCount: 0 },
-                            p2: null,
-                            status: "waiting",
-                            createdAt: now,
-                            endAt: null
-                        });
-                        return { isHost: true, matchId };
+// =========================================================
+// 여러 팀이 동시에 플레이할 수 있는 온라인 매칭
+//
+// matchmaking_queue 문서는 대기 중인 방을 연결하는 용도입니다.
+// 실제 경기는 팀마다 별도의 room_... 문서에서 진행됩니다.
+// =========================================================
+
+async function startMatchmaking() {
+    if (
+        !state.initialized ||
+        state.isGameActive ||
+        state.isMatching
+    ) {
+        return;
+    }
+
+    readNickname();
+
+    if (!state.firebaseReady) {
+        showToast(
+            "온라인 연결이 없어 AI 대전으로 전환합니다."
+        );
+
+        startAIMatch();
+        return;
+    }
+
+    resetSession();
+
+    state.isMatching = true;
+    setMatchButtons(true);
+
+    const session = state.session;
+
+    // 비동기 처리 중 변경되지 않도록 값을 보관합니다.
+    const userId = state.userId;
+    const nickname = state.nickname;
+
+    const roomsCollection = collection(
+        state.db,
+        "artifacts",
+        state.appId,
+        "public",
+        "data",
+        "rooms"
+    );
+
+    // 모든 사용자가 공유하는 매칭 대기열입니다.
+    // 실제 대전 점수는 이 문서에 저장하지 않습니다.
+    const queueRef = doc(
+        roomsCollection,
+        "matchmaking_queue"
+    );
+
+    // 새 팀이 사용할 고유한 방 ID를 미리 생성합니다.
+    const newRoomRef = doc(roomsCollection);
+
+    try {
+        const result = await runTransaction(
+            state.db,
+            async (transaction) => {
+                // 트랜잭션 재시도마다 현재 시각을 다시 확인합니다.
+                const now = Date.now();
+
+                const queueSnapshot =
+                    await transaction.get(queueRef);
+
+                const queue = queueSnapshot.exists()
+                    ? queueSnapshot.data()
+                    : null;
+
+                const waitingRoomId =
+                    queue?.waitingRoomId || null;
+
+                let waitingRoomRef = null;
+                let waitingRoom = null;
+
+                if (waitingRoomId) {
+                    waitingRoomRef = doc(
+                        roomsCollection,
+                        waitingRoomId
+                    );
+
+                    const waitingSnapshot =
+                        await transaction.get(waitingRoomRef);
+
+                    if (waitingSnapshot.exists()) {
+                        waitingRoom = waitingSnapshot.data();
                     }
-                    if (room.status === "waiting" && room.p1.id !== state.userId) {
-                        transaction.update(roomRef, {
-                            p2: { id: state.userId, name: state.nickname, score: 0, attackCount: 0 },
-                            status: "playing",
-                            startAt: now,
-                            endAt: now + GAME_DURATION * 1000
-                        });
-                        return { isHost: false, matchId: room.matchId };
+                }
+
+                // Firestore 트랜잭션은 읽기를 모두 마친 뒤
+                // 쓰기를 실행해야 합니다.
+                const validWaitingRoom =
+                    waitingRoom &&
+                    waitingRoom.status === "waiting" &&
+                    waitingRoom.p1 &&
+                    !waitingRoom.p2 &&
+                    now - (waitingRoom.createdAt || 0) < 120000;
+
+                if (validWaitingRoom) {
+                    // 같은 Firebase 사용자는 자신과 매칭하지 않습니다.
+                    // 다른 기기 또는 일반 창 + 시크릿 창으로 테스트하세요.
+                    if (waitingRoom.p1.id === userId) {
+                        throw new Error(
+                            "이미 이 사용자로 대기 중인 방이 있습니다. " +
+                            "다른 기기 또는 시크릿 창으로 참가하세요."
+                        );
                     }
-                    if (room.status === "waiting" && room.p1.id === state.userId) {
-                        return { isHost: true, matchId: room.matchId };
-                    }
-                    throw new Error("현재 다른 대전이 진행 중입니다.");
+
+                    // 대기 중인 방에 두 번째 플레이어가 참가합니다.
+                    transaction.update(waitingRoomRef, {
+                        p2: {
+                            id: userId,
+                            name: nickname,
+                            score: 0,
+                            attackCount: 0
+                        },
+
+                        status: "playing",
+                        startAt: now,
+                        endAt: now + GAME_DURATION * 1000
+                    });
+
+                    // 이 방은 매칭 완료되었으므로 대기열에서 제거합니다.
+                    // 다음 사용자는 새로운 방을 만들 수 있습니다.
+                    transaction.set(queueRef, {
+                        waitingRoomId: null,
+                        updatedAt: now
+                    });
+
+                    return {
+                        roomId: waitingRoomId,
+                        matchId: waitingRoom.matchId,
+                        isHost: false
+                    };
+                }
+
+                // 만료된 대기방은 종료 상태로 정리합니다.
+                if (
+                    waitingRoomRef &&
+                    waitingRoom?.status === "waiting"
+                ) {
+                    transaction.update(waitingRoomRef, {
+                        status: "finished",
+                        finishedAt: now,
+                        finishReason: "waiting_timeout"
+                    });
+                }
+
+                // 유효한 대기방이 없으면 새로운 고유 방을 생성합니다.
+                // 이미 진행 중인 다른 팀의 방은 건드리지 않습니다.
+                const matchId = newRoomRef.id;
+
+                transaction.set(newRoomRef, {
+                    matchId,
+
+                    p1: {
+                        id: userId,
+                        name: nickname,
+                        score: 0,
+                        attackCount: 0
+                    },
+
+                    p2: null,
+                    status: "waiting",
+                    createdAt: now,
+                    startAt: null,
+                    endAt: null
                 });
-                if (session !== state.session) return;
-                state.isHost = result.isHost;
-                state.matchId = result.matchId;
-                state.unsubscribeRoom = onSnapshot(roomRef, (snapshot) => {
-                    if (session !== state.session || !snapshot.exists()) return;
-                    const room = snapshot.data();
-                    if (room.matchId !== state.matchId) return;
-                    const myPlayer = state.isHost ? room.p1 : room.p2;
-                    const opponent = state.isHost ? room.p2 : room.p1;
-                    if (room.status === "playing" && !state.matchStarted) {
-                        state.opName = opponent?.name || "상대방";
-                        state.deadline = room.endAt;
-                        setupGameUI();
-                        initPhaserGame();
-                        startTimer();
-                    }
-                    if (myPlayer) state.myScore = myPlayer.score ?? 0;
-                    if (opponent) {
-                        state.opScore = opponent.score ?? 0;
-                        state.opName = opponent.name || "상대방";
-                        $("p2-name").textContent = state.opName;
-                        const attackCount = opponent.attackCount || 0;
-                        if (state.isGameActive && attackCount > state.lastAttackHandled) {
-                            // 점수 차감은 서버에서 처리하므로 효과만 표시합니다.
-                            triggerVisualHitEffect();
+
+                transaction.set(queueRef, {
+                    waitingRoomId: newRoomRef.id,
+                    updatedAt: now
+                });
+
+                return {
+                    roomId: newRoomRef.id,
+                    matchId,
+                    isHost: true
+                };
+            }
+        );
+
+        // 매칭 요청 중 사용자가 취소하거나 세션을 변경한 경우입니다.
+        if (session !== state.session) {
+            // 새로 만든 대기방이 있다면 남겨 두지 않습니다.
+            if (result.isHost) {
+                const abandonedRoomRef = doc(
+                    roomsCollection,
+                    result.roomId
+                );
+
+                try {
+                    await runTransaction(
+                        state.db,
+                        async (transaction) => {
+                            const snapshot =
+                                await transaction.get(
+                                    abandonedRoomRef
+                                );
+
+                            if (!snapshot.exists()) {
+                                return;
+                            }
+
+                            const room = snapshot.data();
+
+                            if (
+                                room.matchId === result.matchId &&
+                                room.status === "waiting" &&
+                                room.p1?.id === userId
+                            ) {
+                                transaction.update(
+                                    abandonedRoomRef,
+                                    {
+                                        status: "finished",
+                                        finishedAt: Date.now(),
+                                        finishReason: "cancelled"
+                                    }
+                                );
+                            }
                         }
-                        state.lastAttackHandled = attackCount;
-                    }
-                    renderScores();
-                    if (room.status === "finished" && state.matchStarted && !state.isEnding) {
-                        endGame(true);
-                    } else if (room.status === "finished" && !state.matchStarted) {
-                        cancelMatchmaking();
-                    }
-                }, (error) => {
-                    console.error("경기 구독 오류:", error);
-                    showToast("온라인 경기 정보를 받지 못했습니다.", "danger");
-                    if (state.isMatching) {
-                        resetSession();
-                        setMatchButtons(false);
-                    }
-                });
-            } catch (error) {
-                console.error("매칭 오류:", error);
-                if (session !== state.session) return;
-                resetSession();
-                setMatchButtons(false);
-                showToast(`매칭할 수 없습니다. (${error.code || error.message})`, "danger");
+                    );
+                } catch (cleanupError) {
+                    console.error(
+                        "취소된 대기방 정리 오류:",
+                        cleanupError
+                    );
+                }
             }
+
+            return;
         }
+
+        // 이제부터 이 팀에 배정된 방만 사용합니다.
+        state.roomId = result.roomId;
+        state.matchId = result.matchId;
+        state.isHost = result.isHost;
+
+        const roomRef = getRoomRef();
+
+        state.unsubscribeRoom = onSnapshot(
+            roomRef,
+
+            (snapshot) => {
+                if (session !== state.session) {
+                    return;
+                }
+
+                if (!snapshot.exists()) {
+                    showToast(
+                        "대전방이 없어졌습니다. 다시 매칭해 주세요.",
+                        "danger"
+                    );
+
+                    returnToLobby();
+                    return;
+                }
+
+                const room = snapshot.data();
+
+                if (room.matchId !== state.matchId) {
+                    return;
+                }
+
+                const myPlayer = state.isHost
+                    ? room.p1
+                    : room.p2;
+
+                const opponent = state.isHost
+                    ? room.p2
+                    : room.p1;
+
+                // 매칭 완료 후 게임을 한 번만 시작합니다.
+                if (
+                    room.status === "playing" &&
+                    !state.matchStarted
+                ) {
+                    state.opName =
+                        opponent?.name || "상대방";
+
+                    state.deadline = room.endAt;
+
+                    setupGameUI();
+                    initPhaserGame();
+                    startTimer();
+
+                    showToast(
+                        "상대방과 매칭되었습니다. 대전을 시작합니다!",
+                        "success"
+                    );
+                }
+
+                if (myPlayer) {
+                    state.myScore = myPlayer.score ?? 0;
+                }
+
+                if (opponent) {
+                    state.opScore = opponent.score ?? 0;
+                    state.opName =
+                        opponent.name || "상대방";
+
+                    $("p2-name").textContent =
+                        state.opName;
+
+                    const attackCount =
+                        opponent.attackCount || 0;
+
+                    if (
+                        state.isGameActive &&
+                        attackCount > state.lastAttackHandled
+                    ) {
+                        // 점수 차감은 applyScoreChange()의
+                        // 트랜잭션에서 이미 처리됩니다.
+                        // 여기서는 피격 효과만 표시합니다.
+                        triggerVisualHitEffect();
+                    }
+
+                    state.lastAttackHandled = attackCount;
+                }
+
+                renderScores();
+
+                if (
+                    room.status === "finished" &&
+                    state.matchStarted &&
+                    !state.isEnding
+                ) {
+                    endGame(true);
+                } else if (
+                    room.status === "finished" &&
+                    !state.matchStarted
+                ) {
+                    showToast(
+                        "대기방이 종료되었습니다. 다시 매칭해 주세요."
+                    );
+
+                    cancelMatchmaking();
+                }
+            },
+
+            (error) => {
+                console.error(
+                    "경기 구독 오류:",
+                    error
+                );
+
+                if (session !== state.session) {
+                    return;
+                }
+
+                showToast(
+                    "온라인 경기 정보를 받지 못했습니다. " +
+                    "연결 상태를 확인해 주세요.",
+                    "danger"
+                );
+
+                returnToLobby();
+            }
+        );
+    } catch (error) {
+        console.error("매칭 오류:", error);
+
+        if (session !== state.session) {
+            return;
+        }
+
+        resetSession();
+        setMatchButtons(false);
+
+        if (
+            error.message?.includes(
+                "이미 이 사용자로 대기 중인 방"
+            )
+        ) {
+            showToast(
+                error.message,
+                "danger"
+            );
+        } else {
+            showToast(
+                "매칭에 실패했습니다. " +
+                "Firebase 연결과 Firestore 규칙을 확인해 주세요.",
+                "danger"
+            );
+        }
+    }
+}
+
         async function cancelMatchmaking() {
             if (!state.isMatching) return;
             const roomRef = state.roomId ? getRoomRef() : null;
