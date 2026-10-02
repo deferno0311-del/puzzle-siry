@@ -4,10 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>퀴즈 퍼즐 대전 - 사칙연산 Match-3</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Noto+Sans+KR:wght@400;600;700;900&display=swap" rel="stylesheet">
+
     <style>
         body {
             font-family: 'Noto Sans KR', 'Outfit', sans-serif;
@@ -16,6 +18,7 @@
             overflow-x: hidden;
             user-select: none;
         }
+
         .glass-panel {
             background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(16px);
@@ -23,146 +26,388 @@
             border: 1px solid rgba(255, 255, 255, 0.12);
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
         }
+
         .glass-card {
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.15);
         }
+
         @keyframes damageFlash {
             0% { opacity: 0; }
             20% { opacity: 0.85; }
             100% { opacity: 0; }
         }
-        .animate-damage { animation: damageFlash 0.45s ease-out forwards; }
-        @keyframes toastIn {
-            from { transform: translateY(-30px) scale(0.9); opacity: 0; }
-            to { transform: translateY(0) scale(1); opacity: 1; }
+
+        .animate-damage {
+            animation: damageFlash 0.45s ease-out forwards;
         }
-        .animate-toast { animation: toastIn 0.3s ease-out forwards; }
+
+        @keyframes toastIn {
+            from {
+                transform: translateY(-30px) scale(0.9);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+        }
+
+        .animate-toast {
+            animation: toastIn 0.3s ease-out forwards;
+        }
+
         #phaser-container {
             width: 100%;
             max-width: 432px;
             aspect-ratio: 1 / 1;
             margin: 0 auto;
         }
+
         #phaser-container canvas {
             display: block;
             border-radius: 1rem;
             touch-action: none;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
         }
-        button:disabled { cursor: not-allowed; opacity: 0.65; }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.65;
+        }
     </style>
 </head>
+
 <body class="min-h-screen flex flex-col items-center justify-center p-3 sm:p-6 relative">
-    <div id="damage-overlay" class="fixed inset-0 bg-red-600/50 z-50 pointer-events-none hidden"></div>
-    <div id="toast-container" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center w-full max-w-sm px-4 pointer-events-none" role="status" aria-live="polite"></div>
+    <div
+        id="damage-overlay"
+        class="fixed inset-0 bg-red-600/50 z-50 pointer-events-none hidden"
+    ></div>
+
+    <div
+        id="toast-container"
+        class="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center w-full max-w-sm px-4 pointer-events-none"
+        role="status"
+        aria-live="polite"
+    ></div>
 
     <main class="w-full max-w-4xl min-h-[650px] flex flex-col relative z-10">
-        <section id="lobby-screen" class="glass-panel rounded-3xl p-6 sm:p-10 flex flex-col items-center justify-between my-auto w-full max-w-2xl mx-auto text-center">
+
+        <!-- 로비 -->
+        <section
+            id="lobby-screen"
+            class="glass-panel rounded-3xl p-6 sm:p-10 flex flex-col items-center justify-between my-auto w-full max-w-2xl mx-auto text-center"
+        >
             <div>
                 <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500/20 border border-purple-400/30 text-purple-300 text-xs font-semibold mb-4">
                     <i class="fa-solid fa-bolt text-yellow-400"></i>
                     1v1 퍼즐 · 사칙연산 퀴즈 대전
                 </div>
-                <h1 class="text-3xl sm:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-yellow-300 mb-3">QUIZ ATTACK 3-MATCH</h1>
+
+                <h1 class="text-3xl sm:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-yellow-300 mb-3">
+                    QUIZ ATTACK 3-MATCH
+                </h1>
+
                 <p class="text-slate-300 text-sm sm:text-base max-w-md mx-auto mb-4 leading-relaxed">
                     3개 이상의 동일 블록을 맞춰 점수를 얻으세요.
-                    <span class="text-yellow-300 font-bold">2×2 동일 블록</span>이 포함된 반응이 발생하면 사칙연산 퀴즈가 발동합니다.
+                    <span class="text-yellow-300 font-bold">2×2 동일 블록</span>이
+                    포함된 반응이 발생하면 사칙연산 퀴즈가 발동합니다.
                 </p>
+
                 <p class="text-sm leading-relaxed">
-                    정답을 맞히면 <span class="text-green-400 font-bold">내 점수 +275점</span>과
-                    <span class="text-red-400 font-bold">상대방 점수 -275점</span>이 적용됩니다.
+                    정답을 맞히면
+                    <span class="text-green-400 font-bold">내 점수 +275점</span>과
+                    <span class="text-red-400 font-bold">상대방 점수 -275점</span>이
+                    적용됩니다.
                 </p>
-                <p class="text-xs text-slate-400 mt-2">점수는 음수가 될 수 있습니다.</p>
+
+                <p class="text-xs text-slate-400 mt-2">
+                    점수는 음수가 될 수 있습니다.
+                </p>
+
+                <p class="text-xs text-purple-300 mt-3 leading-relaxed">
+                    여러 팀이 동시에 대전할 수 있습니다.
+                    <br>
+                    직전에 매칭된 상대와는 연속으로 매칭되지 않습니다.
+                </p>
             </div>
+
             <div class="w-full max-w-sm space-y-4 my-6">
                 <div class="relative">
                     <i class="fa-solid fa-user absolute left-4 top-1/2 -translate-y-1/2 text-purple-300/60"></i>
-                    <input type="text" id="player-nickname" maxlength="10" placeholder="닉네임을 입력하세요" aria-label="플레이어 닉네임" class="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-400/50 font-bold">
+
+                    <input
+                        type="text"
+                        id="player-nickname"
+                        maxlength="10"
+                        placeholder="닉네임을 입력하세요"
+                        aria-label="플레이어 닉네임"
+                        class="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-400/50 font-bold"
+                    >
                 </div>
-                <button id="btn-find-match" type="button" onclick="startMatchmaking()" disabled class="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 text-white font-extrabold text-lg active:scale-95 transition flex items-center justify-center gap-3">
-                    <i class="fa-solid fa-spinner fa-spin"></i> 연결 상태를 확인하고 있습니다.
+
+                <button
+                    id="btn-find-match"
+                    type="button"
+                    onclick="startMatchmaking()"
+                    disabled
+                    class="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 text-white font-extrabold text-lg active:scale-95 transition flex items-center justify-center gap-3"
+                >
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    연결 상태를 확인하고 있습니다.
                 </button>
-                <button id="btn-ai-match" type="button" onclick="startAIMatch()" disabled class="w-full py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-slate-200 font-bold text-sm border border-white/20 transition flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-robot text-purple-400"></i> AI 봇 연습 모드를 시작합니다.
+
+                <button
+                    id="btn-ai-match"
+                    type="button"
+                    onclick="startAIMatch()"
+                    disabled
+                    class="w-full py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-slate-200 font-bold text-sm border border-white/20 transition flex items-center justify-center gap-2"
+                >
+                    <i class="fa-solid fa-robot text-purple-400"></i>
+                    AI 봇 연습 모드를 시작합니다.
                 </button>
-                <button id="btn-cancel-match" type="button" onclick="cancelMatchmaking()" class="hidden w-full py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-slate-200 font-bold text-sm border border-white/20">매칭을 취소합니다.</button>
-                <p id="connection-status" class="text-xs text-slate-400">연결 상태를 확인하고 있습니다.</p>
+
+                <button
+                    id="btn-cancel-match"
+                    type="button"
+                    onclick="cancelMatchmaking()"
+                    class="hidden w-full py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-slate-200 font-bold text-sm border border-white/20"
+                >
+                    매칭을 취소합니다.
+                </button>
+
+                <p
+                    id="matching-status"
+                    class="hidden text-xs text-yellow-300 leading-relaxed"
+                    role="status"
+                    aria-live="polite"
+                ></p>
+
+                <p id="connection-status" class="text-xs text-slate-400">
+                    연결 상태를 확인하고 있습니다.
+                </p>
             </div>
+
             <div class="w-full mt-2 glass-card rounded-2xl p-4 text-left">
                 <div class="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
-                    <span class="text-xs font-bold text-purple-300 flex items-center gap-2"><i class="fa-solid fa-trophy text-yellow-400"></i> 명예의 전당 Top 5</span>
-                    <span class="text-[10px] text-slate-400">온라인 대전 기록입니다.</span>
+                    <span class="text-xs font-bold text-purple-300 flex items-center gap-2">
+                        <i class="fa-solid fa-trophy text-yellow-400"></i>
+                        명예의 전당 Top 5
+                    </span>
+
+                    <span class="text-[10px] text-slate-400">
+                        온라인 대전 기록입니다.
+                    </span>
                 </div>
-                <div id="leaderboard-list" class="space-y-2 text-sm"><p class="text-center py-3 text-slate-400 text-xs">순위 정보를 불러오고 있습니다.</p></div>
+
+                <div id="leaderboard-list" class="space-y-2 text-sm">
+                    <p class="text-center py-3 text-slate-400 text-xs">
+                        순위 정보를 불러오고 있습니다.
+                    </p>
+                </div>
             </div>
         </section>
 
-        <section id="game-screen" class="hidden flex-col w-full max-w-3xl mx-auto space-y-4">
+        <!-- 게임 -->
+        <section
+            id="game-screen"
+            class="hidden flex-col w-full max-w-3xl mx-auto space-y-4"
+        >
             <div class="glass-panel rounded-2xl p-4 flex flex-col gap-3">
                 <div class="flex items-center justify-between text-xs font-bold text-slate-300 px-1">
-                    <span class="text-yellow-300 text-sm flex items-center gap-1.5"><i class="fa-solid fa-clock"></i> 남은 시간: <span id="game-timer" class="text-base text-white font-black">45</span>초</span>
-                    <span id="match-status-tag" class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-0.5 rounded-full text-[11px]">대전을 진행하고 있습니다.</span>
+                    <span class="text-yellow-300 text-sm flex items-center gap-1.5">
+                        <i class="fa-solid fa-clock"></i>
+                        남은 시간:
+                        <span id="game-timer" class="text-base text-white font-black">45</span>초
+                    </span>
+
+                    <span
+                        id="match-status-tag"
+                        class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-0.5 rounded-full text-[11px]"
+                    >
+                        대전을 진행하고 있습니다.
+                    </span>
                 </div>
-                <div class="w-full bg-slate-800/80 h-3 rounded-full overflow-hidden border border-white/10 p-0.5"><div id="timer-progress" class="bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-500 h-full rounded-full w-full"></div></div>
+
+                <div class="w-full bg-slate-800/80 h-3 rounded-full overflow-hidden border border-white/10 p-0.5">
+                    <div
+                        id="timer-progress"
+                        class="bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-500 h-full rounded-full w-full"
+                    ></div>
+                </div>
+
                 <div class="grid grid-cols-2 gap-3 mt-1">
                     <div class="glass-card rounded-xl p-3 flex items-center gap-3 border-l-4 border-l-purple-500">
-                        <div class="w-10 h-10 shrink-0 rounded-full bg-purple-500/30 border border-purple-400/50 flex items-center justify-center text-purple-300"><i class="fa-solid fa-user"></i></div>
-                        <div class="overflow-hidden"><div id="p1-name" class="text-xs text-slate-400 font-semibold truncate">플레이어</div><div id="p1-score" class="text-xl font-black text-white">0 점</div></div>
+                        <div class="w-10 h-10 shrink-0 rounded-full bg-purple-500/30 border border-purple-400/50 flex items-center justify-center text-purple-300">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+
+                        <div class="overflow-hidden">
+                            <div id="p1-name" class="text-xs text-slate-400 font-semibold truncate">
+                                플레이어
+                            </div>
+                            <div id="p1-score" class="text-xl font-black text-white">
+                                0 점
+                            </div>
+                        </div>
                     </div>
+
                     <div class="glass-card rounded-xl p-3 flex items-center gap-3 border-r-4 border-r-red-500 justify-between">
-                        <div class="overflow-hidden text-right w-full"><div id="p2-name" class="text-xs text-slate-400 font-semibold truncate">상대방</div><div id="p2-score" class="text-xl font-black text-white">0 점</div></div>
-                        <div class="w-10 h-10 shrink-0 rounded-full bg-red-500/30 border border-red-400/50 flex items-center justify-center text-red-300"><i class="fa-solid fa-robot"></i></div>
+                        <div class="overflow-hidden text-right w-full">
+                            <div id="p2-name" class="text-xs text-slate-400 font-semibold truncate">
+                                상대방
+                            </div>
+                            <div id="p2-score" class="text-xl font-black text-white">
+                                0 점
+                            </div>
+                        </div>
+
+                        <div class="w-10 h-10 shrink-0 rounded-full bg-red-500/30 border border-red-400/50 flex items-center justify-center text-red-300">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
                     </div>
                 </div>
             </div>
+
             <div class="glass-panel rounded-3xl p-3 sm:p-4 flex flex-col items-center justify-center">
                 <div id="phaser-container"></div>
-                <p class="mt-3 text-slate-400 text-xs text-center leading-relaxed">인접한 블록을 차례로 눌러 교환하세요.<br><span class="text-yellow-300 font-bold">2×2 동일 블록</span>이 포함된 연쇄 반응이 끝나면 퀴즈가 발동합니다.</p>
+
+                <p class="mt-3 text-slate-400 text-xs text-center leading-relaxed">
+                    인접한 블록을 차례로 눌러 교환하세요.
+                    <br>
+                    <span class="text-yellow-300 font-bold">2×2 동일 블록</span>이
+                    포함된 연쇄 반응이 끝나면 퀴즈가 발동합니다.
+                </p>
             </div>
+
             <p id="timer-guide" class="text-xs text-slate-400 text-center"></p>
         </section>
     </main>
 
-    <div id="quiz-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-40 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="quiz-question">
+    <!-- 퀴즈 -->
+    <div
+        id="quiz-modal"
+        class="fixed inset-0 bg-black/80 backdrop-blur-md z-40 flex items-center justify-center p-4 hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quiz-question"
+    >
         <div class="glass-panel bg-slate-900/90 border-2 border-purple-500/50 rounded-3xl p-6 sm:p-8 w-full max-w-lg text-center space-y-6 animate-toast">
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-bold"><i class="fa-solid fa-bolt"></i> 사칙연산 퀴즈가 발동했습니다!</div>
-            <p class="text-sm text-slate-300">올바른 계산 결과를 선택하세요.</p>
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-bold">
+                <i class="fa-solid fa-bolt"></i>
+                사칙연산 퀴즈가 발동했습니다!
+            </div>
+
+            <p class="text-sm text-slate-300">
+                올바른 계산 결과를 선택하세요.
+            </p>
+
             <h2 id="quiz-question" class="text-3xl sm:text-4xl font-extrabold text-white"></h2>
+
             <div id="quiz-options" class="grid grid-cols-2 gap-3"></div>
-            <p class="text-xs text-slate-400 leading-relaxed">정답을 맞히면 <span class="text-green-400 font-bold">내 점수가 275점 증가</span>하고, <span class="text-red-400 font-bold">상대방 점수가 275점 감소</span>합니다.</p>
+
+            <p class="text-xs text-slate-400 leading-relaxed">
+                정답을 맞히면
+                <span class="text-green-400 font-bold">내 점수가 275점 증가</span>하고,
+                <span class="text-red-400 font-bold">상대방 점수가 275점 감소</span>합니다.
+            </p>
         </div>
     </div>
-    <div id="result-modal" class="fixed inset-0 bg-black/85 backdrop-blur-lg z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="result-title">
+
+    <!-- 결과 -->
+    <div
+        id="result-modal"
+        class="fixed inset-0 bg-black/85 backdrop-blur-lg z-50 flex items-center justify-center p-4 hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="result-title"
+    >
         <div class="glass-panel bg-slate-900/95 border border-white/20 rounded-3xl p-8 w-full max-w-md text-center space-y-6 animate-toast">
-            <div id="result-badge" class="w-20 h-20 mx-auto rounded-full flex items-center justify-center text-4xl">🏆</div>
-            <div><h2 id="result-title" class="text-3xl font-black text-white mb-2">VICTORY!</h2><p id="result-subtitle" class="text-sm text-slate-300"></p></div>
-            <div class="glass-card rounded-2xl p-4 grid grid-cols-2 gap-2">
-                <div><p class="text-xs text-slate-400 font-semibold">최종 내 점수입니다.</p><p id="res-my-score" class="text-2xl font-black text-purple-300">0점</p></div>
-                <div><p class="text-xs text-slate-400 font-semibold">상대방 점수입니다.</p><p id="res-op-score" class="text-2xl font-black text-red-400">0점</p></div>
+            <div id="result-badge" class="w-20 h-20 mx-auto rounded-full flex items-center justify-center text-4xl">
+                🏆
             </div>
+
+            <div>
+                <h2 id="result-title" class="text-3xl font-black text-white mb-2">
+                    VICTORY!
+                </h2>
+                <p id="result-subtitle" class="text-sm text-slate-300"></p>
+            </div>
+
+            <div class="glass-card rounded-2xl p-4 grid grid-cols-2 gap-2">
+                <div>
+                    <p class="text-xs text-slate-400 font-semibold">최종 내 점수입니다.</p>
+                    <p id="res-my-score" class="text-2xl font-black text-purple-300">0점</p>
+                </div>
+
+                <div>
+                    <p class="text-xs text-slate-400 font-semibold">상대방 점수입니다.</p>
+                    <p id="res-op-score" class="text-2xl font-black text-red-400">0점</p>
+                </div>
+            </div>
+
             <div class="flex gap-3">
-                <button type="button" onclick="returnToLobby()" class="w-full py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm border border-white/20">로비로 이동합니다.</button>
-                <button type="button" onclick="restartGame()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-sm">다시 시작합니다.</button>
+                <button
+                    type="button"
+                    onclick="returnToLobby()"
+                    class="w-full py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm border border-white/20"
+                >
+                    로비로 이동합니다.
+                </button>
+
+                <button
+                    type="button"
+                    onclick="restartGame()"
+                    class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-sm"
+                >
+                    다시 시작합니다.
+                </button>
             </div>
         </div>
     </div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import {
+            initializeApp
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+
+        import {
+            getAuth,
+            signInAnonymously,
+            signInWithCustomToken
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        import {
+            getFirestore,
+            doc,
+            onSnapshot,
+            collection,
+            getDocs,
+            runTransaction
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // =========================================================
+        // 기본 설정
+        // =========================================================
 
         const GAME_DURATION = 45;
         const QUIZ_REWARD = 275;
         const QUIZ_DAMAGE = 275;
+        const WAITING_TIMEOUT = 120000;
+
         const GRID_SIZE = 8;
         const TILE_SIZE = 54;
         const TILE_TYPES = 5;
-        const COLORS = [0xef4444, 0x3b82f6, 0x10b981, 0xf59e0b, 0xa855f7];
 
-        // 사용자가 제공한 Firebase 웹 앱 설정입니다.
-        // initializeFirebase()에서 참조하는 변수 이름과 일치시켰습니다.
+        const COLORS = [
+            0xef4444,
+            0x3b82f6,
+            0x10b981,
+            0xf59e0b,
+            0xa855f7
+        ];
+
         const LOCAL_FIREBASE_CONFIG = {
             apiKey: "AIzaSyDL88cc1AvcAUW0_f8y7fQHkI2bqPB0028",
             authDomain: "puzzle-siry.firebaseapp.com",
@@ -173,179 +418,372 @@
             appId: "1:786436907175:web:6a207f29b484ad6119fb82"
         };
 
-        // 위 Firebase 웹 앱 appId와 별개인 게임 데이터 경로 이름입니다.
-        const appId = typeof __app_id !== "undefined" ? __app_id : "quiz-match3-v3";
+        const appId = typeof __app_id !== "undefined"
+            ? __app_id
+            : "quiz-match3-v3";
+
         const state = {
             appId,
             db: null,
             auth: null,
+
             userId: "user_" + Math.random().toString(36).slice(2, 11),
             nickname: "플레이어_" + randomInt(1000, 9999),
+
             firebaseReady: false,
             initialized: false,
+
             roomId: null,
             matchId: null,
             isHost: false,
             isAI: false,
+
             myScore: 0,
             opScore: 0,
             opName: "상대방",
+
             isGameActive: false,
             isQuizActive: false,
             matchStarted: false,
             isEnding: false,
             isMatching: false,
+
+            matchRequestPending: false,
+            cancelPending: false,
+
             gameTimer: GAME_DURATION,
             deadline: null,
+
             timerInterval: null,
             aiInterval: null,
+            waitingInterval: null,
             unsubscribeRoom: null,
+
             lastAttackHandled: 0,
             session: 0,
             scoreQueue: Promise.resolve()
         };
+
         window.appState = state;
         window.phaserGame = null;
 
+        // =========================================================
         // 공통 유틸리티
+        // =========================================================
+
         function $(id) {
             return document.getElementById(id);
         }
+
         function randomInt(min, max) {
             return Math.floor(Math.random() * (max - min + 1)) + min;
         }
+
         function shuffleArray(array) {
             const result = [...array];
+
             for (let i = result.length - 1; i > 0; i--) {
                 const j = randomInt(0, i);
                 [result[i], result[j]] = [result[j], result[i]];
             }
+
             return result;
         }
+
         function showToast(message, type = "info") {
             const toast = document.createElement("div");
+
             const colorClass = type === "danger"
                 ? "bg-red-600/95 border-red-400"
                 : type === "success"
                     ? "bg-emerald-600/95 border-emerald-400"
                     : "bg-purple-600/95 border-purple-400";
-            toast.className = colorClass + " text-white px-4 py-3 rounded-2xl border text-xs sm:text-sm font-bold animate-toast";
+
+            toast.className =
+                colorClass +
+                " text-white px-4 py-3 rounded-2xl border " +
+                "text-xs sm:text-sm font-bold animate-toast";
+
             toast.textContent = message;
             $("toast-container").appendChild(toast);
+
             setTimeout(() => {
                 toast.style.opacity = "0";
                 toast.style.transition = "opacity 0.3s ease";
                 setTimeout(() => toast.remove(), 300);
             }, 3000);
         }
+
         function renderScores() {
             $("p1-score").textContent = `${state.myScore} 점`;
             $("p2-score").textContent = `${state.opScore} 점`;
         }
+
         function renderTimer() {
             const seconds = Math.max(0, state.gameTimer);
+
             $("game-timer").textContent = seconds;
-            $("timer-progress").style.width = `${(seconds / GAME_DURATION) * 100}%`;
+            $("timer-progress").style.width =
+                `${(seconds / GAME_DURATION) * 100}%`;
         }
+
         function readNickname() {
             const nickname = $("player-nickname").value.trim();
-            if (nickname) state.nickname = nickname.slice(0, 10);
+
+            if (nickname) {
+                state.nickname = nickname.slice(0, 10);
+            }
         }
+
         function setMatchButtons(matching) {
-            $("btn-find-match").disabled = matching;
-            $("btn-ai-match").disabled = matching;
+            $("btn-find-match").disabled =
+                matching || !state.initialized;
+
+            $("btn-ai-match").disabled =
+                matching || !state.initialized;
+
             $("btn-find-match").innerHTML = matching
                 ? '<i class="fa-solid fa-spinner fa-spin"></i> 상대방을 찾고 있습니다.'
                 : '<i class="fa-solid fa-gamepad"></i> 실시간 대전을 시작합니다.';
-            $("btn-cancel-match").classList.toggle("hidden", !matching);
+
+            $("btn-cancel-match").classList.toggle(
+                "hidden",
+                !matching
+            );
+
+            $("btn-cancel-match").disabled =
+                state.matchRequestPending || state.cancelPending;
+
+            $("matching-status").classList.toggle(
+                "hidden",
+                !matching
+            );
+
+            if (!matching) {
+                $("matching-status").textContent = "";
+            }
         }
+
+        function getRoomsCollection() {
+            return collection(
+                state.db,
+                "artifacts",
+                state.appId,
+                "public",
+                "data",
+                "rooms"
+            );
+        }
+
+        function getQueueRef() {
+            return doc(
+                getRoomsCollection(),
+                "matchmaking_queue"
+            );
+        }
+
         function getRoomRef(roomId = state.roomId) {
-            return doc(state.db, "artifacts", state.appId, "public", "data", "rooms", roomId);
+            return doc(getRoomsCollection(), roomId);
         }
+
+        function clearWaitingTimer() {
+            if (state.waitingInterval) {
+                clearInterval(state.waitingInterval);
+                state.waitingInterval = null;
+            }
+        }
+
         function clearTimers() {
             if (state.timerInterval) {
                 clearInterval(state.timerInterval);
                 state.timerInterval = null;
             }
+
             if (state.aiInterval) {
                 clearInterval(state.aiInterval);
                 state.aiInterval = null;
             }
+
+            clearWaitingTimer();
         }
+
         function stopRoomListener() {
             if (state.unsubscribeRoom) {
                 state.unsubscribeRoom();
                 state.unsubscribeRoom = null;
             }
         }
+
         function destroyPhaserGame() {
             if (window.phaserGame) {
                 window.phaserGame.destroy(true);
                 window.phaserGame = null;
             }
+
             $("phaser-container").replaceChildren();
         }
+
         function resetSession() {
             clearTimers();
             stopRoomListener();
             destroyPhaserGame();
+
             state.session++;
+
             state.roomId = null;
             state.matchId = null;
             state.isHost = false;
             state.isAI = false;
+
             state.myScore = 0;
             state.opScore = 0;
             state.opName = "상대방";
+
             state.isGameActive = false;
             state.isQuizActive = false;
             state.matchStarted = false;
             state.isEnding = false;
             state.isMatching = false;
+
+            state.matchRequestPending = false;
+            state.cancelPending = false;
+
             state.gameTimer = GAME_DURATION;
             state.deadline = null;
+
             state.lastAttackHandled = 0;
             state.scoreQueue = Promise.resolve();
+
             $("quiz-modal").classList.add("hidden");
             $("result-modal").classList.add("hidden");
             $("damage-overlay").classList.add("hidden");
         }
 
+        // =========================================================
+        // 직전 상대 기록
+        //
+        // 현재 Firebase 사용자 ID별로 브라우저에 저장합니다.
+        // AI 대전은 직전 온라인 상대 기록을 변경하지 않습니다.
+        // =========================================================
+
+        const previousOpponentCache = new Map();
+
+        function previousOpponentStorageKey() {
+            return `quiz_previous_opponent:${state.appId}:${state.userId}`;
+        }
+
+        function getPreviousOpponentId() {
+            const key = previousOpponentStorageKey();
+
+            try {
+                const savedId = localStorage.getItem(key);
+
+                if (savedId) {
+                    return savedId;
+                }
+            } catch (error) {
+                console.warn("직전 상대 조회 오류:", error);
+            }
+
+            return previousOpponentCache.get(key) || null;
+        }
+
+        function rememberPreviousOpponent(opponentId) {
+            if (
+                !opponentId ||
+                opponentId === state.userId
+            ) {
+                return;
+            }
+
+            const key = previousOpponentStorageKey();
+
+            previousOpponentCache.set(key, opponentId);
+
+            try {
+                localStorage.setItem(key, opponentId);
+            } catch (error) {
+                console.warn("직전 상대 저장 오류:", error);
+            }
+        }
+
+        // 이전 단일 대기방 형식도 읽을 수 있도록 합니다.
+        function getQueuedRoomIds(queue) {
+            const rawIds = Array.isArray(queue?.waitingRoomIds)
+                ? queue.waitingRoomIds
+                : queue?.waitingRoomId
+                    ? [queue.waitingRoomId]
+                    : [];
+
+            return [...new Set(
+                rawIds.filter((id) => {
+                    return (
+                        typeof id === "string" &&
+                        id.length > 0 &&
+                        !id.includes("/") &&
+                        id !== "matchmaking_queue"
+                    );
+                })
+            )];
+        }
+
+        // =========================================================
         // Firebase 초기화
+        // =========================================================
+
         async function initializeFirebase() {
             try {
                 let firebaseConfig = LOCAL_FIREBASE_CONFIG;
+
                 if (typeof __firebase_config !== "undefined") {
-                    firebaseConfig = typeof __firebase_config === "string"
-                        ? JSON.parse(__firebase_config)
-                        : __firebase_config;
+                    firebaseConfig =
+                        typeof __firebase_config === "string"
+                            ? JSON.parse(__firebase_config)
+                            : __firebase_config;
                 }
+
                 if (!firebaseConfig) {
                     throw new Error("Firebase 설정이 없습니다.");
                 }
+
                 const app = initializeApp(firebaseConfig);
+
                 state.db = getFirestore(app);
                 state.auth = getAuth(app);
-                const token = typeof __initial_auth_token !== "undefined"
-                    ? __initial_auth_token
-                    : null;
+
+                const token =
+                    typeof __initial_auth_token !== "undefined"
+                        ? __initial_auth_token
+                        : null;
+
                 if (token) {
                     await signInWithCustomToken(state.auth, token);
                 } else {
                     await signInAnonymously(state.auth);
                 }
+
                 if (!state.auth.currentUser) {
                     throw new Error("사용자 인증에 실패했습니다.");
                 }
+
                 state.userId = state.auth.currentUser.uid;
                 state.firebaseReady = true;
-                $("connection-status").textContent = "온라인 대전을 사용할 수 있습니다.";
+
+                $("connection-status").textContent =
+                    "온라인 대전을 사용할 수 있습니다.";
             } catch (error) {
                 console.warn("AI 모드로 초기화합니다.", error);
+
                 state.firebaseReady = false;
-                // 후속 설정 오류를 화면에서도 확인할 수 있도록 표시합니다.
-                const detail = error.code || error.message || "알 수 없는 오류";
-                $("connection-status").textContent = `온라인 연결에 실패했습니다. (${detail}) AI 연습 모드를 사용할 수 있습니다.`;
+
+                const detail =
+                    error.code ||
+                    error.message ||
+                    "알 수 없는 오류";
+
+                $("connection-status").textContent =
+                    `온라인 연결에 실패했습니다. (${detail}) ` +
+                    "AI 연습 모드를 사용할 수 있습니다.";
             } finally {
                 state.initialized = true;
                 setMatchButtons(false);
@@ -353,71 +791,150 @@
             }
         }
 
+        // =========================================================
         // 명예의 전당
+        // =========================================================
+
         async function fetchLeaderboard() {
             const list = $("leaderboard-list");
             list.replaceChildren();
-            if (!state.firebaseReady) {
+
+            function showMessage(text) {
                 const message = document.createElement("p");
-                message.className = "text-center py-3 text-xs text-slate-400";
-                message.textContent = "온라인 연결 후 실제 순위 정보를 확인할 수 있습니다.";
-                list.appendChild(message);
+                message.className =
+                    "text-center py-3 text-xs text-slate-400";
+                message.textContent = text;
+                list.replaceChildren(message);
+            }
+
+            if (!state.firebaseReady) {
+                showMessage(
+                    "온라인 연결 후 실제 순위 정보를 확인할 수 있습니다."
+                );
                 return;
             }
+
             try {
-                const reference = collection(state.db, "artifacts", state.appId, "public", "data", "leaderboard");
+                const reference = collection(
+                    state.db,
+                    "artifacts",
+                    state.appId,
+                    "public",
+                    "data",
+                    "leaderboard"
+                );
+
                 const snapshot = await getDocs(reference);
-                const players = snapshot.docs.map((item) => item.data());
-                players.sort((a, b) => (b.wins || 0) - (a.wins || 0) || (b.score || 0) - (a.score || 0));
+
+                const players = snapshot.docs.map(
+                    (item) => item.data()
+                );
+
+                players.sort((a, b) => {
+                    return (
+                        (b.wins || 0) - (a.wins || 0) ||
+                        (b.score || 0) - (a.score || 0)
+                    );
+                });
+
                 if (players.length === 0) {
-                    const message = document.createElement("p");
-                    message.className = "text-center py-3 text-xs text-slate-400";
-                    message.textContent = "등록된 순위 정보가 없습니다.";
-                    list.appendChild(message);
+                    showMessage("등록된 순위 정보가 없습니다.");
                     return;
                 }
+
                 players.slice(0, 5).forEach((player, index) => {
                     const row = document.createElement("div");
-                    row.className = "flex items-center justify-between gap-3 py-2 px-2 rounded-lg bg-white/5 text-xs";
+                    row.className =
+                        "flex items-center justify-between gap-3 " +
+                        "py-2 px-2 rounded-lg bg-white/5 text-xs";
+
                     const name = document.createElement("span");
                     name.className = "font-bold text-slate-200";
-                    name.textContent = `${index + 1}. ${player.nickname || "익명"}`;
+                    name.textContent =
+                        `${index + 1}. ${player.nickname || "익명"}`;
+
                     const score = document.createElement("span");
-                    score.className = "text-purple-300 font-semibold shrink-0";
-                    score.textContent = `${player.wins || 0}승 (${player.score || 0}점)`;
+                    score.className =
+                        "text-purple-300 font-semibold shrink-0";
+                    score.textContent =
+                        `${player.wins || 0}승 (${player.score || 0}점)`;
+
                     row.append(name, score);
                     list.appendChild(row);
                 });
             } catch (error) {
                 console.error("순위 조회 오류:", error);
-                const message = document.createElement("p");
-                message.className = "text-center py-3 text-xs text-slate-400";
-                message.textContent = "순위 정보를 불러오지 못했습니다.";
-                list.appendChild(message);
+                showMessage("순위 정보를 불러오지 못했습니다.");
             }
         }
+
         async function saveLeaderboard() {
-            if (!state.firebaseReady || state.isAI || state.myScore <= state.opScore || !state.matchId) return;
+            if (
+                !state.firebaseReady ||
+                state.isAI ||
+                state.myScore <= state.opScore ||
+                !state.matchId
+            ) {
+                return;
+            }
+
             const userId = state.userId;
             const nickname = state.nickname;
             const score = state.myScore;
             const matchId = state.matchId;
-            const playerRef = doc(state.db, "artifacts", state.appId, "public", "data", "leaderboard", userId);
-            const recordRef = doc(state.db, "artifacts", state.appId, "public", "data", "matchResults", `${matchId}_${userId}`);
+
+            const playerRef = doc(
+                state.db,
+                "artifacts",
+                state.appId,
+                "public",
+                "data",
+                "leaderboard",
+                userId
+            );
+
+            const recordRef = doc(
+                state.db,
+                "artifacts",
+                state.appId,
+                "public",
+                "data",
+                "matchResults",
+                `${matchId}_${userId}`
+            );
+
             try {
                 await runTransaction(state.db, async (transaction) => {
-                    const recordSnapshot = await transaction.get(recordRef);
-                    if (recordSnapshot.exists()) return;
-                    const playerSnapshot = await transaction.get(playerRef);
-                    const previous = playerSnapshot.exists() ? playerSnapshot.data() : {};
+                    const recordSnapshot =
+                        await transaction.get(recordRef);
+
+                    if (recordSnapshot.exists()) {
+                        return;
+                    }
+
+                    const playerSnapshot =
+                        await transaction.get(playerRef);
+
+                    const previous = playerSnapshot.exists()
+                        ? playerSnapshot.data()
+                        : {};
+
                     transaction.set(playerRef, {
                         userId,
                         nickname,
                         wins: (previous.wins || 0) + 1,
-                        score: playerSnapshot.exists() ? Math.max(previous.score ?? score, score) : score,
+                        score: playerSnapshot.exists()
+                            ? Math.max(previous.score ?? score, score)
+                            : score,
                         updatedAt: Date.now()
                     });
-                    transaction.set(recordRef, { userId, matchId, score, createdAt: Date.now() });
+
+                    transaction.set(recordRef, {
+                        userId,
+                        matchId,
+                        score,
+                        createdAt: Date.now()
+                    });
                 });
             } catch (error) {
                 console.error("승리 기록 저장 오류:", error);
@@ -425,306 +942,653 @@
             }
         }
 
+        // =========================================================
         // 게임 시작 및 AI
+        // =========================================================
+
         function setupGameUI() {
+            clearWaitingTimer();
+
             state.isGameActive = true;
             state.isQuizActive = false;
             state.matchStarted = true;
             state.isEnding = false;
             state.isMatching = false;
+
             $("lobby-screen").classList.add("hidden");
             $("game-screen").classList.remove("hidden");
             $("game-screen").classList.add("flex");
+
             $("result-modal").classList.add("hidden");
             $("quiz-modal").classList.add("hidden");
+
             $("p1-name").textContent = `${state.nickname} (나)`;
             $("p2-name").textContent = state.opName;
-            $("match-status-tag").textContent = state.isAI ? "AI 연습 모드입니다." : "실시간 대전 중입니다.";
+
+            $("match-status-tag").textContent = state.isAI
+                ? "AI 연습 모드입니다."
+                : "실시간 대전 중입니다.";
+
             $("timer-guide").textContent = state.isAI
                 ? "AI 연습 모드에서는 퀴즈를 푸는 동안 시간이 멈춥니다."
-                : "온라인 대전에서는 두 플레이어의 공통 종료 시간을 사용하며, 퀴즈 중에도 시간이 흐릅니다.";
+                : "온라인 대전에서는 공통 종료 시간을 사용하며, 퀴즈 중에도 시간이 흐릅니다.";
+
             renderScores();
             renderTimer();
             setMatchButtons(false);
         }
+
         function startAIMatch() {
-            if (!state.initialized || state.isGameActive || state.isMatching) return;
+            if (
+                !state.initialized ||
+                state.isGameActive ||
+                state.isMatching
+            ) {
+                return;
+            }
+
             readNickname();
             resetSession();
+
             state.isAI = true;
             state.isHost = true;
             state.opName = "AI 봇 (연습)";
+
             setupGameUI();
             initPhaserGame();
             startTimer();
             startAIBehavior();
         }
+
         function startAIBehavior() {
-            if (state.aiInterval) clearInterval(state.aiInterval);
+            if (state.aiInterval) {
+                clearInterval(state.aiInterval);
+            }
+
             state.aiInterval = setInterval(() => {
-                if (!state.isGameActive || state.isQuizActive) return;
-                if (Math.random() < 0.3) state.opScore += 100;
+                if (
+                    !state.isGameActive ||
+                    state.isQuizActive
+                ) {
+                    return;
+                }
+
+                if (Math.random() < 0.3) {
+                    state.opScore += 100;
+                }
+
                 if (Math.random() < 0.12) {
                     state.myScore -= QUIZ_DAMAGE;
                     triggerVisualHitEffect();
                 }
+
                 renderScores();
             }, 3000);
         }
-// =========================================================
-// 직전 매칭 상대 저장 및 조회
-// =========================================================
 
-// 브라우저 저장소를 사용할 수 없는 환경에서는
-// 현재 페이지가 열려 있는 동안만 기억합니다.
-const previousOpponentCache = new Map();
+        // =========================================================
+        // 다중 팀 매칭 + 직전 상대 재매칭 방지
+        //
+        // 대기열: rooms/matchmaking_queue
+        // 실제 경기: rooms/{고유한 방 ID}
+        //
+        // 양쪽의 직전 상대 중 하나라도 일치하면 매칭하지 않습니다.
+        // =========================================================
 
-function previousOpponentStorageKey() {
-    return (
-        `quiz_previous_opponent:` +
-        `${state.appId}:${state.userId}`
-    );
-}
-
-function getPreviousOpponentId() {
-    const key = previousOpponentStorageKey();
-
-    try {
-        const savedId = localStorage.getItem(key);
-
-        if (savedId) {
-            return savedId;
-        }
-    } catch (error) {
-        console.warn(
-            "직전 상대 정보를 읽지 못했습니다.",
-            error
-        );
-    }
-
-    return previousOpponentCache.get(key) || null;
-}
-
-function rememberPreviousOpponent(opponentId) {
-    if (!opponentId || opponentId === state.userId) {
-        return;
-    }
-
-    const key = previousOpponentStorageKey();
-
-    previousOpponentCache.set(key, opponentId);
-
-    try {
-        localStorage.setItem(key, opponentId);
-    } catch (error) {
-        console.warn(
-            "직전 상대 정보를 저장하지 못했습니다.",
-            error
-        );
-    }
-}
-
-// =========================================================
-// 여러 팀이 동시에 플레이할 수 있는 온라인 매칭
-//
-// matchmaking_queue 문서는 대기 중인 방을 연결하는 용도입니다.
-// 실제 경기는 팀마다 별도의 room_... 문서에서 진행됩니다.
-// =========================================================
-
-async function startMatchmaking() {
-    if (
-        !state.initialized ||
-        state.isGameActive ||
-        state.isMatching
-    ) {
-        return;
-    }
-
-    readNickname();
-
-    if (!state.firebaseReady) {
-        showToast(
-            "온라인 연결이 없어 AI 대전으로 전환합니다."
-        );
-
-        startAIMatch();
-        return;
-    }
-
-    resetSession();
-
-    state.isMatching = true;
-    setMatchButtons(true);
-
-    const session = state.session;
-
-    // 비동기 처리 중 변경되지 않도록 값을 보관합니다.
-    const userId = state.userId;
-    const nickname = state.nickname;
-
-    const roomsCollection = collection(
-        state.db,
-        "artifacts",
-        state.appId,
-        "public",
-        "data",
-        "rooms"
-    );
-
-    // 모든 사용자가 공유하는 매칭 대기열입니다.
-    // 실제 대전 점수는 이 문서에 저장하지 않습니다.
-    const queueRef = doc(
-        roomsCollection,
-        "matchmaking_queue"
-    );
-
-    // 새 팀이 사용할 고유한 방 ID를 미리 생성합니다.
-    const newRoomRef = doc(roomsCollection);
-
-    try {
-        const result = await runTransaction(
-            state.db,
-            async (transaction) => {
-                // 트랜잭션 재시도마다 현재 시각을 다시 확인합니다.
-                const now = Date.now();
-
-                const queueSnapshot =
-                    await transaction.get(queueRef);
-
-                const queue = queueSnapshot.exists()
-                    ? queueSnapshot.data()
-                    : null;
-
-                const waitingRoomId =
-                    queue?.waitingRoomId || null;
-
-                let waitingRoomRef = null;
-                let waitingRoom = null;
-
-                if (waitingRoomId) {
-                    waitingRoomRef = doc(
-                        roomsCollection,
-                        waitingRoomId
-                    );
-
-                    const waitingSnapshot =
-                        await transaction.get(waitingRoomRef);
-
-                    if (waitingSnapshot.exists()) {
-                        waitingRoom = waitingSnapshot.data();
-                    }
-                }
-
-                // Firestore 트랜잭션은 읽기를 모두 마친 뒤
-                // 쓰기를 실행해야 합니다.
-                const validWaitingRoom =
-                    waitingRoom &&
-                    waitingRoom.status === "waiting" &&
-                    waitingRoom.p1 &&
-                    !waitingRoom.p2 &&
-                    now - (waitingRoom.createdAt || 0) < 120000;
-
-                if (validWaitingRoom) {
-                    // 같은 Firebase 사용자는 자신과 매칭하지 않습니다.
-                    // 다른 기기 또는 일반 창 + 시크릿 창으로 테스트하세요.
-                    if (waitingRoom.p1.id === userId) {
-                        throw new Error(
-                            "이미 이 사용자로 대기 중인 방이 있습니다. " +
-                            "다른 기기 또는 시크릿 창으로 참가하세요."
-                        );
-                    }
-
-                    // 대기 중인 방에 두 번째 플레이어가 참가합니다.
-                    transaction.update(waitingRoomRef, {
-                        p2: {
-                            id: userId,
-                            name: nickname,
-                            score: 0,
-                            attackCount: 0
-                        },
-
-                        status: "playing",
-                        startAt: now,
-                        endAt: now + GAME_DURATION * 1000
-                    });
-
-                    // 이 방은 매칭 완료되었으므로 대기열에서 제거합니다.
-                    // 다음 사용자는 새로운 방을 만들 수 있습니다.
-                    transaction.set(queueRef, {
-                        waitingRoomId: null,
-                        updatedAt: now
-                    });
-
-                    return {
-                        roomId: waitingRoomId,
-                        matchId: waitingRoom.matchId,
-                        isHost: false
-                    };
-                }
-
-                // 만료된 대기방은 종료 상태로 정리합니다.
-                if (
-                    waitingRoomRef &&
-                    waitingRoom?.status === "waiting"
-                ) {
-                    transaction.update(waitingRoomRef, {
-                        status: "finished",
-                        finishedAt: now,
-                        finishReason: "waiting_timeout"
-                    });
-                }
-
-                // 유효한 대기방이 없으면 새로운 고유 방을 생성합니다.
-                // 이미 진행 중인 다른 팀의 방은 건드리지 않습니다.
-                const matchId = newRoomRef.id;
-
-                transaction.set(newRoomRef, {
-                    matchId,
-
-                    p1: {
-                        id: userId,
-                        name: nickname,
-                        score: 0,
-                        attackCount: 0
-                    },
-
-                    p2: null,
-                    status: "waiting",
-                    createdAt: now,
-                    startAt: null,
-                    endAt: null
-                });
-
-                transaction.set(queueRef, {
-                    waitingRoomId: newRoomRef.id,
-                    updatedAt: now
-                });
-
-                return {
-                    roomId: newRoomRef.id,
-                    matchId,
-                    isHost: true
-                };
+        async function startMatchmaking() {
+            if (
+                !state.initialized ||
+                state.isGameActive ||
+                state.isMatching
+            ) {
+                return;
             }
-        );
 
-        // 매칭 요청 중 사용자가 취소하거나 세션을 변경한 경우입니다.
-        if (session !== state.session) {
-            // 새로 만든 대기방이 있다면 남겨 두지 않습니다.
-            if (result.isHost) {
-                const abandonedRoomRef = doc(
-                    roomsCollection,
-                    result.roomId
+            readNickname();
+
+            if (!state.firebaseReady) {
+                showToast("온라인 연결이 없어 AI 대전으로 전환합니다.");
+                startAIMatch();
+                return;
+            }
+
+            resetSession();
+
+            state.isMatching = true;
+            state.matchRequestPending = true;
+            setMatchButtons(true);
+
+            $("matching-status").textContent =
+                "매칭 대기열을 확인하고 있습니다.";
+
+            const session = state.session;
+            const userId = state.userId;
+            const nickname = state.nickname;
+            const previousOpponentId = getPreviousOpponentId();
+
+            const roomsCollection = getRoomsCollection();
+            const queueRef = getQueueRef();
+            const newRoomRef = doc(roomsCollection);
+
+            try {
+                const result = await runTransaction(
+                    state.db,
+                    async (transaction) => {
+                        const now = Date.now();
+
+                        const queueSnapshot =
+                            await transaction.get(queueRef);
+
+                        const queue = queueSnapshot.exists()
+                            ? queueSnapshot.data()
+                            : {};
+
+                        const queuedIds = getQueuedRoomIds(queue);
+                        const waitingRooms = [];
+
+                        // 모든 읽기를 완료한 뒤 쓰기를 실행합니다.
+                        for (const roomId of queuedIds) {
+                            const reference = doc(
+                                roomsCollection,
+                                roomId
+                            );
+
+                            const snapshot =
+                                await transaction.get(reference);
+
+                            waitingRooms.push({
+                                roomId,
+                                reference,
+                                room: snapshot.exists()
+                                    ? snapshot.data()
+                                    : null
+                            });
+                        }
+
+                        const validRooms = [];
+                        const expiredRooms = [];
+
+                        for (const entry of waitingRooms) {
+                            const room = entry.room;
+
+                            if (
+                                !room ||
+                                room.status !== "waiting" ||
+                                !room.p1 ||
+                                room.p2
+                            ) {
+                                continue;
+                            }
+
+                            if (
+                                now - (room.createdAt || 0) >=
+                                WAITING_TIMEOUT
+                            ) {
+                                expiredRooms.push(entry);
+                            } else {
+                                validRooms.push(entry);
+                            }
+                        }
+
+                        const ownWaitingRoom = validRooms.find(
+                            (entry) => entry.room.p1.id === userId
+                        );
+
+                        if (ownWaitingRoom) {
+                            throw new Error(
+                                "이미 이 사용자로 대기 중인 방이 있습니다. " +
+                                "기존 창에서 취소하거나 잠시 후 다시 시도하세요."
+                            );
+                        }
+
+                        // 오래 대기한 방부터 확인합니다.
+                        const matchedRoom = validRooms.find((entry) => {
+                            const host = entry.room.p1;
+
+                            const wasMyPreviousOpponent =
+                                previousOpponentId === host.id;
+
+                            const wasTheirPreviousOpponent =
+                                host.previousOpponentId === userId;
+
+                            return (
+                                host.id !== userId &&
+                                !wasMyPreviousOpponent &&
+                                !wasTheirPreviousOpponent
+                            );
+                        });
+
+                        // 아래부터 쓰기 작업입니다.
+                        for (const entry of expiredRooms) {
+                            transaction.update(entry.reference, {
+                                status: "finished",
+                                finishedAt: now,
+                                finishReason: "waiting_timeout"
+                            });
+                        }
+
+                        if (matchedRoom) {
+                            transaction.update(matchedRoom.reference, {
+                                p2: {
+                                    id: userId,
+                                    name: nickname,
+                                    score: 0,
+                                    attackCount: 0,
+                                    previousOpponentId
+                                },
+                                status: "playing",
+                                startAt: now,
+                                endAt: now + GAME_DURATION * 1000
+                            });
+
+                            transaction.set(queueRef, {
+                                waitingRoomIds: validRooms
+                                    .filter((entry) => {
+                                        return entry.roomId !==
+                                            matchedRoom.roomId;
+                                    })
+                                    .map((entry) => entry.roomId),
+                                updatedAt: now
+                            });
+
+                            return {
+                                roomId: matchedRoom.roomId,
+                                matchId: matchedRoom.room.matchId,
+                                isHost: false,
+                                createdAt: matchedRoom.room.createdAt
+                            };
+                        }
+
+                        // 조건에 맞는 상대가 없으면 별도 방에서 기다립니다.
+                        const matchId = newRoomRef.id;
+
+                        transaction.set(newRoomRef, {
+                            matchId,
+                            p1: {
+                                id: userId,
+                                name: nickname,
+                                score: 0,
+                                attackCount: 0,
+                                previousOpponentId
+                            },
+                            p2: null,
+                            status: "waiting",
+                            createdAt: now,
+                            startAt: null,
+                            endAt: null
+                        });
+
+                        transaction.set(queueRef, {
+                            waitingRoomIds: [
+                                ...validRooms.map(
+                                    (entry) => entry.roomId
+                                ),
+                                newRoomRef.id
+                            ],
+                            updatedAt: now
+                        });
+
+                        return {
+                            roomId: newRoomRef.id,
+                            matchId,
+                            isHost: true,
+                            createdAt: now
+                        };
+                    }
                 );
 
-                try {
+                if (session !== state.session) {
+                    return;
+                }
+
+                state.roomId = result.roomId;
+                state.matchId = result.matchId;
+                state.isHost = result.isHost;
+                state.matchRequestPending = false;
+
+                setMatchButtons(true);
+
+                $("matching-status").textContent =
+                    "다른 상대를 기다리고 있습니다. " +
+                    "직전 상대와는 다시 매칭되지 않습니다.";
+
+                const roomRef = getRoomRef();
+
+                state.unsubscribeRoom = onSnapshot(
+                    roomRef,
+                    (snapshot) => {
+                        if (session !== state.session) {
+                            return;
+                        }
+
+                        if (!snapshot.exists()) {
+                            showToast(
+                                "대전방이 없어졌습니다. 다시 매칭해 주세요.",
+                                "danger"
+                            );
+                            returnToLobby();
+                            return;
+                        }
+
+                        const room = snapshot.data();
+
+                        if (room.matchId !== state.matchId) {
+                            return;
+                        }
+
+                        const myPlayer = state.isHost
+                            ? room.p1
+                            : room.p2;
+
+                        const opponent = state.isHost
+                            ? room.p2
+                            : room.p1;
+
+                        if (myPlayer) {
+                            state.myScore = myPlayer.score ?? 0;
+                        }
+
+                        if (opponent) {
+                            state.opScore = opponent.score ?? 0;
+                            state.opName =
+                                opponent.name || "상대방";
+                            $("p2-name").textContent = state.opName;
+                        }
+
+                        // 실제 매칭이 성사된 시점에 상대를 기억합니다.
+                        if (
+                            room.status === "playing" &&
+                            !state.matchStarted
+                        ) {
+                            rememberPreviousOpponent(opponent?.id);
+
+                            state.deadline = room.endAt;
+
+                            setupGameUI();
+                            initPhaserGame();
+                            startTimer();
+
+                            showToast(
+                                "상대방과 매칭되었습니다. 대전을 시작합니다!",
+                                "success"
+                            );
+                        }
+
+                        if (opponent) {
+                            const attackCount =
+                                opponent.attackCount || 0;
+
+                            if (
+                                state.isGameActive &&
+                                attackCount > state.lastAttackHandled
+                            ) {
+                                // 점수 차감은 서버에서 이미 처리되었습니다.
+                                triggerVisualHitEffect();
+                            }
+
+                            state.lastAttackHandled = attackCount;
+                        }
+
+                        renderScores();
+
+                        if (
+                            room.status === "finished" &&
+                            state.matchStarted &&
+                            !state.isEnding
+                        ) {
+                            endGame(true);
+                        } else if (
+                            room.status === "finished" &&
+                            !state.matchStarted &&
+                            !state.cancelPending
+                        ) {
+                            showToast(
+                                "대기방이 종료되었습니다. 다시 매칭해 주세요."
+                            );
+                            returnToLobby();
+                        }
+                    },
+                    (error) => {
+                        console.error("경기 구독 오류:", error);
+
+                        if (session !== state.session) {
+                            return;
+                        }
+
+                        showToast(
+                            "온라인 경기 정보를 받지 못했습니다.",
+                            "danger"
+                        );
+
+                        returnToLobby();
+                    }
+                );
+
+                // 대기방은 최대 2분 동안 유지합니다.
+                if (result.isHost) {
+                    state.waitingInterval = setInterval(() => {
+                        if (
+                            session !== state.session ||
+                            !state.isMatching ||
+                            state.matchStarted
+                        ) {
+                            clearWaitingTimer();
+                            return;
+                        }
+
+                        const remaining = Math.max(
+                            0,
+                            Math.ceil(
+                                (
+                                    result.createdAt +
+                                    WAITING_TIMEOUT -
+                                    Date.now()
+                                ) / 1000
+                            )
+                        );
+
+                        $("matching-status").textContent =
+                            "다른 상대를 기다리고 있습니다. " +
+                            `남은 대기 시간은 ${remaining}초입니다. ` +
+                            "직전 상대와는 다시 매칭되지 않습니다.";
+
+                        if (
+                            remaining === 0 &&
+                            !state.cancelPending
+                        ) {
+                            cancelMatchmaking(true);
+                        }
+                    }, 1000);
+                }
+            } catch (error) {
+                console.error("매칭 오류:", error);
+
+                if (session !== state.session) {
+                    return;
+                }
+
+                resetSession();
+                setMatchButtons(false);
+
+                const message = error.message?.includes(
+                    "이미 이 사용자로 대기 중인 방"
+                )
+                    ? error.message
+                    : "매칭에 실패했습니다. Firebase 연결과 " +
+                      "Firestore 규칙을 확인해 주세요.";
+
+                showToast(message, "danger");
+            }
+        }
+
+        // =========================================================
+        // 대기 취소
+        //
+        // 방 종료와 대기열 제거를 함께 처리합니다.
+        // 이미 매칭이 완료되었다면 방을 취소하지 않습니다.
+        // =========================================================
+
+        async function cancelMatchmaking(timedOut = false) {
+            if (
+                !state.isMatching ||
+                state.matchRequestPending ||
+                state.cancelPending ||
+                !state.roomId
+            ) {
+                return;
+            }
+
+            state.cancelPending = true;
+            setMatchButtons(true);
+
+            const session = state.session;
+            const roomRef = getRoomRef();
+            const queueRef = getQueueRef();
+
+            const roomId = state.roomId;
+            const matchId = state.matchId;
+            const userId = state.userId;
+
+            try {
+                const cancelled = await runTransaction(
+                    state.db,
+                    async (transaction) => {
+                        const roomSnapshot =
+                            await transaction.get(roomRef);
+
+                        const queueSnapshot =
+                            await transaction.get(queueRef);
+
+                        const room = roomSnapshot.exists()
+                            ? roomSnapshot.data()
+                            : null;
+
+                        const queue = queueSnapshot.exists()
+                            ? queueSnapshot.data()
+                            : {};
+
+                        // 相手が先に参加した場合はキャンセルしません。
+                        if (
+                            room &&
+                            room.matchId === matchId &&
+                            room.status === "playing"
+                        ) {
+                            return false;
+                        }
+
+                        if (
+                            room &&
+                            room.matchId === matchId &&
+                            room.status === "waiting" &&
+                            room.p1?.id === userId
+                        ) {
+                            transaction.update(roomRef, {
+                                status: "finished",
+                                finishedAt: Date.now(),
+                                finishReason: timedOut
+                                    ? "waiting_timeout"
+                                    : "cancelled"
+                            });
+                        }
+
+                        const remainingIds =
+                            getQueuedRoomIds(queue).filter(
+                                (id) => id !== roomId
+                            );
+
+                        transaction.set(queueRef, {
+                            waitingRoomIds: remainingIds,
+                            updatedAt: Date.now()
+                        });
+
+                        return true;
+                    }
+                );
+
+                if (session !== state.session) {
+                    return;
+                }
+
+                state.cancelPending = false;
+
+                if (!cancelled) {
+                    setMatchButtons(state.isMatching);
+
+                    showToast(
+                        "すでに相手とのマッチングが完了しています。"
+                            .replace(
+                                "すでに相手とのマッチングが完了しています。",
+                                "이미 상대방과 매칭되었습니다. 대전을 시작합니다."
+                            )
+                    );
+                    return;
+                }
+
+                returnToLobby();
+
+                showToast(
+                    timedOut
+                        ? "대기 시간이 종료되었습니다. 다시 매칭해 주세요."
+                        : "매칭을 취소했습니다."
+                );
+            } catch (error) {
+                console.error("매칭 취소 오류:", error);
+
+                if (session !== state.session) {
+                    return;
+                }
+
+                state.cancelPending = false;
+                setMatchButtons(state.isMatching);
+
+                showToast(
+                    "매칭 취소에 실패했습니다. 다시 시도해 주세요.",
+                    "danger"
+                );
+            }
+        }
+
+        // =========================================================
+        // 점수 반영
+        // =========================================================
+
+        function applyScoreChange(gainedScore, quizAttack = false) {
+            if (!state.isGameActive) {
+                return Promise.resolve();
+            }
+
+            if (state.isAI) {
+                state.myScore += gainedScore;
+
+                if (quizAttack) {
+                    state.opScore -= QUIZ_DAMAGE;
+                }
+
+                renderScores();
+                return Promise.resolve();
+            }
+
+            const session = state.session;
+            const roomRef = getRoomRef();
+            const matchId = state.matchId;
+            const userId = state.userId;
+
+            const myKey = state.isHost ? "p1" : "p2";
+            const opponentKey = state.isHost ? "p2" : "p1";
+
+            const submittedAt = Date.now();
+
+            state.scoreQueue = state.scoreQueue
+                .then(async () => {
+                    if (session !== state.session) {
+                        return;
+                    }
+
                     await runTransaction(
                         state.db,
                         async (transaction) => {
                             const snapshot =
-                                await transaction.get(
-                                    abandonedRoomRef
-                                );
+                                await transaction.get(roomRef);
 
                             if (!snapshot.exists()) {
                                 return;
@@ -733,307 +1597,164 @@ async function startMatchmaking() {
                             const room = snapshot.data();
 
                             if (
-                                room.matchId === result.matchId &&
-                                room.status === "waiting" &&
-                                room.p1?.id === userId
+                                room.matchId !== matchId ||
+                                room.status !== "playing" ||
+                                submittedAt >= room.endAt
                             ) {
-                                transaction.update(
-                                    abandonedRoomRef,
-                                    {
-                                        status: "finished",
-                                        finishedAt: Date.now(),
-                                        finishReason: "cancelled"
-                                    }
-                                );
+                                return;
                             }
+
+                            const me = room[myKey];
+                            const opponent = room[opponentKey];
+
+                            if (
+                                !me ||
+                                me.id !== userId ||
+                                !opponent
+                            ) {
+                                return;
+                            }
+
+                            const updates = {
+                                [`${myKey}.score`]:
+                                    (me.score ?? 0) + gainedScore
+                            };
+
+                            if (quizAttack) {
+                                updates[`${opponentKey}.score`] =
+                                    (opponent.score ?? 0) -
+                                    QUIZ_DAMAGE;
+
+                                updates[`${myKey}.attackCount`] =
+                                    (me.attackCount || 0) + 1;
+                            }
+
+                            transaction.update(roomRef, updates);
                         }
                     );
-                } catch (cleanupError) {
-                    console.error(
-                        "취소된 대기방 정리 오류:",
-                        cleanupError
-                    );
-                }
-            }
+                })
+                .catch((error) => {
+                    console.error("점수 반영 오류:", error);
 
-            return;
-        }
-
-        // 이제부터 이 팀에 배정된 방만 사용합니다.
-        state.roomId = result.roomId;
-        state.matchId = result.matchId;
-        state.isHost = result.isHost;
-
-        const roomRef = getRoomRef();
-
-        state.unsubscribeRoom = onSnapshot(
-            roomRef,
-
-            (snapshot) => {
-                if (session !== state.session) {
-                    return;
-                }
-
-                if (!snapshot.exists()) {
-                    showToast(
-                        "대전방이 없어졌습니다. 다시 매칭해 주세요.",
-                        "danger"
-                    );
-
-                    returnToLobby();
-                    return;
-                }
-
-                const room = snapshot.data();
-
-                if (room.matchId !== state.matchId) {
-                    return;
-                }
-
-                const myPlayer = state.isHost
-                    ? room.p1
-                    : room.p2;
-
-                const opponent = state.isHost
-                    ? room.p2
-                    : room.p1;
-
-                // 매칭 완료 후 게임을 한 번만 시작합니다.
-                if (
-                    room.status === "playing" &&
-                    !state.matchStarted
-                ) {
-                    state.opName =
-                        opponent?.name || "상대방";
-
-                    state.deadline = room.endAt;
-
-                    setupGameUI();
-                    initPhaserGame();
-                    startTimer();
-
-                    showToast(
-                        "상대방과 매칭되었습니다. 대전을 시작합니다!",
-                        "success"
-                    );
-                }
-
-                if (myPlayer) {
-                    state.myScore = myPlayer.score ?? 0;
-                }
-
-                if (opponent) {
-                    state.opScore = opponent.score ?? 0;
-                    state.opName =
-                        opponent.name || "상대방";
-
-                    $("p2-name").textContent =
-                        state.opName;
-
-                    const attackCount =
-                        opponent.attackCount || 0;
-
-                    if (
-                        state.isGameActive &&
-                        attackCount > state.lastAttackHandled
-                    ) {
-                        // 점수 차감은 applyScoreChange()의
-                        // 트랜잭션에서 이미 처리됩니다.
-                        // 여기서는 피격 효과만 표시합니다.
-                        triggerVisualHitEffect();
+                    if (session === state.session) {
+                        showToast(
+                            "온라인 점수를 반영하지 못했습니다.",
+                            "danger"
+                        );
                     }
-
-                    state.lastAttackHandled = attackCount;
-                }
-
-                renderScores();
-
-                if (
-                    room.status === "finished" &&
-                    state.matchStarted &&
-                    !state.isEnding
-                ) {
-                    endGame(true);
-                } else if (
-                    room.status === "finished" &&
-                    !state.matchStarted
-                ) {
-                    showToast(
-                        "대기방이 종료되었습니다. 다시 매칭해 주세요."
-                    );
-
-                    cancelMatchmaking();
-                }
-            },
-
-            (error) => {
-                console.error(
-                    "경기 구독 오류:",
-                    error
-                );
-
-                if (session !== state.session) {
-                    return;
-                }
-
-                showToast(
-                    "온라인 경기 정보를 받지 못했습니다. " +
-                    "연결 상태를 확인해 주세요.",
-                    "danger"
-                );
-
-                returnToLobby();
-            }
-        );
-    } catch (error) {
-        console.error("매칭 오류:", error);
-
-        if (session !== state.session) {
-            return;
-        }
-
-        resetSession();
-        setMatchButtons(false);
-
-        if (
-            error.message?.includes(
-                "이미 이 사용자로 대기 중인 방"
-            )
-        ) {
-            showToast(
-                error.message,
-                "danger"
-            );
-        } else {
-            showToast(
-                "매칭에 실패했습니다. " +
-                "Firebase 연결과 Firestore 규칙을 확인해 주세요.",
-                "danger"
-            );
-        }
-    }
-}
-
-        async function cancelMatchmaking() {
-            if (!state.isMatching) return;
-            const roomRef = state.roomId ? getRoomRef() : null;
-            const matchId = state.matchId;
-            const isHost = state.isHost;
-            resetSession();
-            setMatchButtons(false);
-            if (roomRef && matchId && isHost) {
-                try {
-                    await runTransaction(state.db, async (transaction) => {
-                        const snapshot = await transaction.get(roomRef);
-                        if (!snapshot.exists()) return;
-                        const room = snapshot.data();
-                        if (room.matchId === matchId && room.status === "waiting" && room.p1.id === state.userId) {
-                            transaction.update(roomRef, { status: "finished" });
-                        }
-                    });
-                } catch (error) {
-                    console.error("매칭 취소 오류:", error);
-                }
-            }
-        }
-
-        // 점수 반영
-        function applyScoreChange(gainedScore, quizAttack = false) {
-            if (!state.isGameActive) return Promise.resolve();
-            if (state.isAI) {
-                state.myScore += gainedScore;
-                if (quizAttack) state.opScore -= QUIZ_DAMAGE;
-                renderScores();
-                return Promise.resolve();
-            }
-            const session = state.session;
-            const roomRef = getRoomRef();
-            const matchId = state.matchId;
-            const myKey = state.isHost ? "p1" : "p2";
-            const opponentKey = state.isHost ? "p2" : "p1";
-            const submittedAt = Date.now();
-            state.scoreQueue = state.scoreQueue.then(async () => {
-                if (session !== state.session) return;
-                await runTransaction(state.db, async (transaction) => {
-                    const snapshot = await transaction.get(roomRef);
-                    if (!snapshot.exists()) return;
-                    const room = snapshot.data();
-                    if (room.matchId !== matchId || room.status !== "playing" || submittedAt >= room.endAt) return;
-                    const me = room[myKey];
-                    const opponent = room[opponentKey];
-                    if (!me || me.id !== state.userId || !opponent) return;
-                    const updates = { [`${myKey}.score`]: (me.score ?? 0) + gainedScore };
-                    if (quizAttack) {
-                        updates[`${opponentKey}.score`] = (opponent.score ?? 0) - QUIZ_DAMAGE;
-                        updates[`${myKey}.attackCount`] = (me.attackCount || 0) + 1;
-                    }
-                    transaction.update(roomRef, updates);
                 });
-            }).catch((error) => {
-                console.error("점수 반영 오류:", error);
-                if (session === state.session) showToast("온라인 점수를 반영하지 못했습니다.", "danger");
-            });
+
             return state.scoreQueue;
         }
 
+        // =========================================================
         // 시간
+        // =========================================================
+
         function startTimer() {
-            if (state.timerInterval) clearInterval(state.timerInterval);
+            if (state.timerInterval) {
+                clearInterval(state.timerInterval);
+            }
+
             renderTimer();
+
             if (state.isAI) {
                 state.timerInterval = setInterval(() => {
-                    if (!state.isGameActive || state.isQuizActive) return;
+                    if (
+                        !state.isGameActive ||
+                        state.isQuizActive
+                    ) {
+                        return;
+                    }
+
                     state.gameTimer--;
                     renderTimer();
-                    if (state.gameTimer <= 0) endGame();
+
+                    if (state.gameTimer <= 0) {
+                        endGame();
+                    }
                 }, 1000);
+
                 return;
             }
+
             const tick = () => {
-                if (!state.isGameActive) return;
-                state.gameTimer = Math.max(0, Math.ceil((state.deadline - Date.now()) / 1000));
+                if (!state.isGameActive) {
+                    return;
+                }
+
+                state.gameTimer = Math.max(
+                    0,
+                    Math.ceil(
+                        (state.deadline - Date.now()) / 1000
+                    )
+                );
+
                 renderTimer();
-                if (state.gameTimer <= 0) endGame();
+
+                if (state.gameTimer <= 0) {
+                    endGame();
+                }
             };
+
             state.timerInterval = setInterval(tick, 200);
             tick();
         }
 
-        // 사칙연산 문제
+        // =========================================================
+        // 사칙연산 퀴즈
+        // =========================================================
+
         function createArithmeticQuiz() {
             const operators = ["+", "−", "×", "÷"];
             const operator = operators[randomInt(0, 3)];
+
             let a;
             let b;
             let correctAnswer;
+
             switch (operator) {
                 case "+":
                     a = randomInt(1, 50);
                     b = randomInt(1, 50);
                     correctAnswer = a + b;
                     break;
+
                 case "−":
                     a = randomInt(1, 50);
                     b = randomInt(1, a);
                     correctAnswer = a - b;
                     break;
+
                 case "×":
                     a = randomInt(2, 12);
                     b = randomInt(2, 12);
                     correctAnswer = a * b;
                     break;
+
                 case "÷":
                     b = randomInt(2, 12);
                     correctAnswer = randomInt(1, 12);
                     a = b * correctAnswer;
                     break;
             }
+
             const choices = new Set([correctAnswer]);
+
             while (choices.size < 4) {
-                const candidate = correctAnswer + randomInt(-12, 12);
-                if (candidate >= 0 && candidate !== correctAnswer) choices.add(candidate);
+                const candidate =
+                    correctAnswer + randomInt(-12, 12);
+
+                if (
+                    candidate >= 0 &&
+                    candidate !== correctAnswer
+                ) {
+                    choices.add(candidate);
+                }
             }
+
             const options = shuffleArray([...choices]);
+
             return {
                 question: `${a} ${operator} ${b} = ?`,
                 options,
@@ -1041,413 +1762,829 @@ async function startMatchmaking() {
                 correctAnswer
             };
         }
+
         function triggerQuizModal() {
-            if (!state.isGameActive || state.isQuizActive) return;
+            if (
+                !state.isGameActive ||
+                state.isQuizActive
+            ) {
+                return;
+            }
+
             state.isQuizActive = true;
+
             const quiz = createArithmeticQuiz();
             const session = state.session;
             const container = $("quiz-options");
+
             $("quiz-question").textContent = quiz.question;
             container.replaceChildren();
+
             let answered = false;
+
             quiz.options.forEach((option, index) => {
                 const button = document.createElement("button");
+
                 button.type = "button";
-                button.className = "w-full py-4 px-3 rounded-xl bg-white/10 hover:bg-purple-600/50 border border-white/20 text-white font-bold text-xl transition active:scale-95";
+                button.className =
+                    "w-full py-4 px-3 rounded-xl bg-white/10 " +
+                    "hover:bg-purple-600/50 border border-white/20 " +
+                    "text-white font-bold text-xl transition active:scale-95";
+
                 button.textContent = option;
+
                 button.addEventListener("click", () => {
-                    if (answered || !state.isGameActive || session !== state.session) return;
-                    if (!state.isAI && Date.now() >= state.deadline) {
+                    if (
+                        answered ||
+                        !state.isGameActive ||
+                        session !== state.session
+                    ) {
+                        return;
+                    }
+
+                    if (
+                        !state.isAI &&
+                        Date.now() >= state.deadline
+                    ) {
                         endGame();
                         return;
                     }
+
                     answered = true;
-                    container.querySelectorAll("button").forEach((item) => {
-                        item.disabled = true;
-                    });
+
+                    container.querySelectorAll("button").forEach(
+                        (item) => {
+                            item.disabled = true;
+                        }
+                    );
+
                     if (index === quiz.answerIndex) {
                         applyScoreChange(QUIZ_REWARD, true);
-                        showToast("정답입니다! 내 점수 +275점, 상대방 점수 -275점!", "success");
+
+                        showToast(
+                            `정답입니다! 내 점수 +${QUIZ_REWARD}점, ` +
+                            `상대방 점수 -${QUIZ_DAMAGE}점!`,
+                            "success"
+                        );
                     } else {
-                        showToast(`오답입니다. 정답은 ${quiz.correctAnswer}입니다.`, "danger");
+                        showToast(
+                            `오답입니다. 정답은 ${quiz.correctAnswer}입니다.`,
+                            "danger"
+                        );
                     }
+
                     $("quiz-modal").classList.add("hidden");
                     state.isQuizActive = false;
                 });
+
                 container.appendChild(button);
             });
+
             $("quiz-modal").classList.remove("hidden");
             container.querySelector("button")?.focus();
         }
 
+        // =========================================================
         // 피격 효과
+        // =========================================================
+
         function triggerVisualHitEffect() {
             const overlay = $("damage-overlay");
+
             overlay.classList.remove("hidden");
             overlay.classList.remove("animate-damage");
+
             void overlay.offsetWidth;
+
             overlay.classList.add("animate-damage");
-            setTimeout(() => overlay.classList.add("hidden"), 450);
-            const scene = window.phaserGame?.scene?.scenes?.[0];
-            if (scene?.cameras?.main) scene.cameras.main.shake(300, 0.02);
-            showToast("상대방의 퀴즈 공격으로 275점이 차감되었습니다!", "danger");
+
+            setTimeout(() => {
+                overlay.classList.add("hidden");
+            }, 450);
+
+            const scene =
+                window.phaserGame?.scene?.scenes?.[0];
+
+            if (scene?.cameras?.main) {
+                scene.cameras.main.shake(300, 0.02);
+            }
+
+            showToast(
+                `상대방의 퀴즈 공격으로 ${QUIZ_DAMAGE}점이 차감되었습니다!`,
+                "danger"
+            );
         }
 
+        // =========================================================
         // 종료 및 재시작
+        // =========================================================
+
         async function endGame(roomAlreadyFinished = false) {
-            if (state.isEnding || !state.matchStarted) return;
+            if (
+                state.isEnding ||
+                !state.matchStarted
+            ) {
+                return;
+            }
+
             state.isEnding = true;
             state.isGameActive = false;
             state.isQuizActive = false;
+
             clearTimers();
             $("quiz-modal").classList.add("hidden");
+
             const session = state.session;
+
             if (!state.isAI && state.roomId) {
                 try {
                     await state.scoreQueue;
+
                     const roomRef = getRoomRef();
                     const matchId = state.matchId;
-                    const finalRoom = await runTransaction(state.db, async (transaction) => {
-                        const snapshot = await transaction.get(roomRef);
-                        if (!snapshot.exists()) return null;
-                        const room = snapshot.data();
-                        if (room.matchId !== matchId) return null;
-                        if (room.status === "playing" && !roomAlreadyFinished && Date.now() >= room.endAt) {
-                            transaction.update(roomRef, { status: "finished", finishedAt: Date.now() });
+
+                    const finalRoom = await runTransaction(
+                        state.db,
+                        async (transaction) => {
+                            const snapshot =
+                                await transaction.get(roomRef);
+
+                            if (!snapshot.exists()) {
+                                return null;
+                            }
+
+                            const room = snapshot.data();
+
+                            if (room.matchId !== matchId) {
+                                return null;
+                            }
+
+                            if (
+                                room.status === "playing" &&
+                                !roomAlreadyFinished &&
+                                Date.now() >= room.endAt
+                            ) {
+                                transaction.update(roomRef, {
+                                    status: "finished",
+                                    finishedAt: Date.now()
+                                });
+                            }
+
+                            return room;
                         }
-                        return room;
-                    });
-                    if (session !== state.session) return;
+                    );
+
+                    if (session !== state.session) {
+                        return;
+                    }
+
                     if (finalRoom) {
-                        const me = state.isHost ? finalRoom.p1 : finalRoom.p2;
-                        const opponent = state.isHost ? finalRoom.p2 : finalRoom.p1;
+                        const me = state.isHost
+                            ? finalRoom.p1
+                            : finalRoom.p2;
+
+                        const opponent = state.isHost
+                            ? finalRoom.p2
+                            : finalRoom.p1;
+
                         state.myScore = me?.score ?? 0;
                         state.opScore = opponent?.score ?? 0;
+
+                        // 結果取得時에도直前相手を補完します。
+                        rememberPreviousOpponent(opponent?.id);
                     }
                 } catch (error) {
                     console.error("경기 종료 동기화 오류:", error);
-                    showToast("최종 점수를 서버와 동기화하지 못했습니다.", "danger");
+
+                    showToast(
+                        "최종 점수를 서버와 동기화하지 못했습니다.",
+                        "danger"
+                    );
                 }
             }
-            if (session !== state.session) return;
+
+            if (session !== state.session) {
+                return;
+            }
+
             stopRoomListener();
             renderScores();
             showResult();
             await saveLeaderboard();
         }
+
         function showResult() {
             const my = state.myScore;
             const opponent = state.opScore;
+
             $("res-my-score").textContent = `${my}점`;
             $("res-op-score").textContent = `${opponent}점`;
+
             const badge = $("result-badge");
             const title = $("result-title");
             const subtitle = $("result-subtitle");
-            badge.className = "w-20 h-20 mx-auto rounded-full flex items-center justify-center text-4xl border-2";
+
+            badge.className =
+                "w-20 h-20 mx-auto rounded-full flex items-center " +
+                "justify-center text-4xl border-2";
+
             if (my > opponent) {
-                badge.classList.add("bg-yellow-500/30", "border-yellow-400");
+                badge.classList.add(
+                    "bg-yellow-500/30",
+                    "border-yellow-400"
+                );
                 badge.textContent = "🏆";
+
                 title.textContent = "VICTORY!";
-                title.className = "text-3xl font-black text-yellow-300 mb-2";
-                subtitle.textContent = "퍼즐과 사칙연산 퀴즈로 승리를 쟁취했습니다!";
+                title.className =
+                    "text-3xl font-black text-yellow-300 mb-2";
+
+                subtitle.textContent =
+                    "퍼즐과 사칙연산 퀴즈로 승리를 쟁취했습니다!";
             } else if (my < opponent) {
-                badge.classList.add("bg-red-500/30", "border-red-400");
+                badge.classList.add(
+                    "bg-red-500/30",
+                    "border-red-400"
+                );
                 badge.textContent = "💀";
+
                 title.textContent = "DEFEAT";
-                title.className = "text-3xl font-black text-red-400 mb-2";
-                subtitle.textContent = "다시 도전하여 상대방의 점수를 넘어서세요.";
+                title.className =
+                    "text-3xl font-black text-red-400 mb-2";
+
+                subtitle.textContent =
+                    "다시 도전하여 상대방의 점수를 넘어서세요.";
             } else {
-                badge.classList.add("bg-slate-500/30", "border-slate-400");
+                badge.classList.add(
+                    "bg-slate-500/30",
+                    "border-slate-400"
+                );
                 badge.textContent = "🤝";
+
                 title.textContent = "DRAW";
-                title.className = "text-3xl font-black text-slate-200 mb-2";
-                subtitle.textContent = "치열한 대전 끝에 무승부를 기록했습니다.";
+                title.className =
+                    "text-3xl font-black text-slate-200 mb-2";
+
+                subtitle.textContent =
+                    "치열한 대전 끝에 무승부를 기록했습니다.";
             }
+
             $("result-modal").classList.remove("hidden");
         }
+
         function returnToLobby() {
             resetSession();
+
             $("game-screen").classList.add("hidden");
             $("game-screen").classList.remove("flex");
             $("lobby-screen").classList.remove("hidden");
+
             setMatchButtons(false);
             fetchLeaderboard();
         }
+
         function restartGame() {
             const wasAI = state.isAI;
+
             returnToLobby();
-            if (wasAI) startAIMatch();
-            else startMatchmaking();
+
+            if (wasAI) {
+                startAIMatch();
+            } else {
+                startMatchmaking();
+            }
         }
 
+        // =========================================================
         // Phaser 초기화
+        // =========================================================
+
         function initPhaserGame() {
             destroyPhaserGame();
+
             if (typeof Phaser === "undefined") {
                 state.isGameActive = false;
-                showToast("게임 엔진을 불러오지 못했습니다. 페이지를 새로고침하세요.", "danger");
+
+                showToast(
+                    "게임 엔진을 불러오지 못했습니다. 페이지를 새로고침하세요.",
+                    "danger"
+                );
                 return;
             }
+
             window.phaserGame = new Phaser.Game({
                 type: Phaser.AUTO,
                 width: GRID_SIZE * TILE_SIZE,
                 height: GRID_SIZE * TILE_SIZE,
                 parent: "phaser-container",
                 transparent: true,
-                scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-                scene: { preload: phaserPreload, create: phaserCreate }
+
+                scale: {
+                    mode: Phaser.Scale.FIT,
+                    autoCenter: Phaser.Scale.CENTER_BOTH
+                },
+
+                scene: {
+                    preload: phaserPreload,
+                    create: phaserCreate
+                }
             });
         }
+
         function phaserPreload() {
             COLORS.forEach((color, index) => {
                 const graphics = this.add.graphics();
+
                 graphics.fillStyle(color, 1);
-                graphics.fillRoundedRect(2, 2, TILE_SIZE - 4, TILE_SIZE - 4, 12);
+                graphics.fillRoundedRect(
+                    2, 2,
+                    TILE_SIZE - 4,
+                    TILE_SIZE - 4,
+                    12
+                );
+
                 graphics.lineStyle(2, 0xffffff, 0.4);
-                graphics.strokeRoundedRect(4, 4, TILE_SIZE - 8, TILE_SIZE - 8, 10);
+                graphics.strokeRoundedRect(
+                    4, 4,
+                    TILE_SIZE - 8,
+                    TILE_SIZE - 8,
+                    10
+                );
+
                 graphics.fillStyle(0xffffff, 0.3);
                 graphics.fillCircle(14, 14, 5);
-                graphics.generateTexture(`tile_${index}`, TILE_SIZE, TILE_SIZE);
+
+                graphics.generateTexture(
+                    `tile_${index}`,
+                    TILE_SIZE,
+                    TILE_SIZE
+                );
+
                 graphics.destroy();
             });
+
             const selection = this.add.graphics();
+
             selection.lineStyle(4, 0xffff00, 1);
-            selection.strokeRoundedRect(2, 2, TILE_SIZE - 4, TILE_SIZE - 4, 12);
-            selection.generateTexture("selection", TILE_SIZE, TILE_SIZE);
+            selection.strokeRoundedRect(
+                2, 2,
+                TILE_SIZE - 4,
+                TILE_SIZE - 4,
+                12
+            );
+
+            selection.generateTexture(
+                "selection",
+                TILE_SIZE,
+                TILE_SIZE
+            );
+
             selection.destroy();
         }
+
         function createTile(scene, row, col, type, startY) {
-            const sprite = scene.add.sprite(col * TILE_SIZE, startY ?? row * TILE_SIZE, `tile_${type}`);
+            const sprite = scene.add.sprite(
+                col * TILE_SIZE,
+                startY ?? row * TILE_SIZE,
+                `tile_${type}`
+            );
+
             sprite.setOrigin(0);
             sprite.setInteractive();
+
             sprite.row = row;
             sprite.col = col;
             sprite.tileType = type;
-            sprite.on("pointerdown", () => onTileClick(scene, sprite));
+
+            sprite.on("pointerdown", () => {
+                onTileClick(scene, sprite);
+            });
+
             return sprite;
         }
+
         function phaserCreate() {
             const scene = this;
+
             scene.board = [];
             scene.selectedTile = null;
             scene.isBusy = false;
             scene.pendingQuiz = false;
+
             const background = scene.add.graphics();
             background.fillStyle(0x000000, 0.3);
+
             for (let row = 0; row < GRID_SIZE; row++) {
                 for (let col = 0; col < GRID_SIZE; col++) {
-                    background.fillRoundedRect(col * TILE_SIZE + 2, row * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4, 10);
+                    background.fillRoundedRect(
+                        col * TILE_SIZE + 2,
+                        row * TILE_SIZE + 2,
+                        TILE_SIZE - 4,
+                        TILE_SIZE - 4,
+                        10
+                    );
                 }
             }
-            scene.selectionSprite = scene.add.sprite(-100, -100, "selection");
-            scene.selectionSprite.setOrigin(0).setDepth(10).setVisible(false);
+
+            scene.selectionSprite = scene.add.sprite(
+                -100,
+                -100,
+                "selection"
+            );
+
+            scene.selectionSprite
+                .setOrigin(0)
+                .setDepth(10)
+                .setVisible(false);
+
             for (let row = 0; row < GRID_SIZE; row++) {
                 scene.board[row] = [];
+
                 for (let col = 0; col < GRID_SIZE; col++) {
                     let type;
+
                     do {
                         type = randomInt(0, TILE_TYPES - 1);
                     } while (
-                        (col >= 2 && scene.board[row][col - 1].tileType === type && scene.board[row][col - 2].tileType === type) ||
-                        (row >= 2 && scene.board[row - 1][col].tileType === type && scene.board[row - 2][col].tileType === type) ||
-                        (row >= 1 && col >= 1 && scene.board[row][col - 1].tileType === type && scene.board[row - 1][col].tileType === type && scene.board[row - 1][col - 1].tileType === type)
+                        (
+                            col >= 2 &&
+                            scene.board[row][col - 1].tileType === type &&
+                            scene.board[row][col - 2].tileType === type
+                        ) ||
+                        (
+                            row >= 2 &&
+                            scene.board[row - 1][col].tileType === type &&
+                            scene.board[row - 2][col].tileType === type
+                        ) ||
+                        (
+                            row >= 1 &&
+                            col >= 1 &&
+                            scene.board[row][col - 1].tileType === type &&
+                            scene.board[row - 1][col].tileType === type &&
+                            scene.board[row - 1][col - 1].tileType === type
+                        )
                     );
-                    scene.board[row][col] = createTile(scene, row, col, type);
+
+                    scene.board[row][col] = createTile(
+                        scene,
+                        row,
+                        col,
+                        type
+                    );
                 }
             }
         }
 
+        // =========================================================
         // 블록 선택 및 교환
+        // =========================================================
+
         function onTileClick(scene, tile) {
-            if (scene.isBusy || !state.isGameActive || state.isQuizActive) return;
-            if (!scene.selectedTile) {
-                scene.selectedTile = tile;
-                scene.selectionSprite.setPosition(tile.col * TILE_SIZE, tile.row * TILE_SIZE).setVisible(true);
+            if (
+                scene.isBusy ||
+                !state.isGameActive ||
+                state.isQuizActive
+            ) {
                 return;
             }
+
+            if (!scene.selectedTile) {
+                scene.selectedTile = tile;
+
+                scene.selectionSprite
+                    .setPosition(
+                        tile.col * TILE_SIZE,
+                        tile.row * TILE_SIZE
+                    )
+                    .setVisible(true);
+
+                return;
+            }
+
             const previous = scene.selectedTile;
+
             scene.selectedTile = null;
             scene.selectionSprite.setVisible(false);
-            if (previous === tile) return;
-            const adjacent = Math.abs(previous.row - tile.row) + Math.abs(previous.col - tile.col) === 1;
+
+            if (previous === tile) {
+                return;
+            }
+
+            const adjacent =
+                Math.abs(previous.row - tile.row) +
+                Math.abs(previous.col - tile.col) === 1;
+
             if (adjacent) {
                 scene.pendingQuiz = false;
                 swapTiles(scene, previous, tile);
             } else {
                 scene.selectedTile = tile;
-                scene.selectionSprite.setPosition(tile.col * TILE_SIZE, tile.row * TILE_SIZE).setVisible(true);
+
+                scene.selectionSprite
+                    .setPosition(
+                        tile.col * TILE_SIZE,
+                        tile.row * TILE_SIZE
+                    )
+                    .setVisible(true);
             }
         }
+
         function swapTiles(scene, first, second) {
             scene.isBusy = true;
+
             const row1 = first.row;
             const col1 = first.col;
             const row2 = second.row;
             const col2 = second.col;
+
             scene.board[row1][col1] = second;
             scene.board[row2][col2] = first;
+
             first.row = row2;
             first.col = col2;
             second.row = row1;
             second.col = col1;
-            scene.tweens.add({ targets: first, x: col2 * TILE_SIZE, y: row2 * TILE_SIZE, duration: 80 });
+
+            scene.tweens.add({
+                targets: first,
+                x: col2 * TILE_SIZE,
+                y: row2 * TILE_SIZE,
+                duration: 80
+            });
+
             scene.tweens.add({
                 targets: second,
                 x: col1 * TILE_SIZE,
                 y: row1 * TILE_SIZE,
                 duration: 80,
+
                 onComplete: () => {
                     const matches = checkBoardMatches(scene);
+
                     if (matches.matchedTiles.length > 0) {
                         processMatches(scene, matches);
                         return;
                     }
+
                     scene.board[row1][col1] = first;
                     scene.board[row2][col2] = second;
+
                     first.row = row1;
                     first.col = col1;
                     second.row = row2;
                     second.col = col2;
-                    scene.tweens.add({ targets: first, x: col1 * TILE_SIZE, y: row1 * TILE_SIZE, duration: 80 });
+
+                    scene.tweens.add({
+                        targets: first,
+                        x: col1 * TILE_SIZE,
+                        y: row1 * TILE_SIZE,
+                        duration: 80
+                    });
+
                     scene.tweens.add({
                         targets: second,
                         x: col2 * TILE_SIZE,
                         y: row2 * TILE_SIZE,
                         duration: 80,
-                        onComplete: () => { scene.isBusy = false; }
+
+                        onComplete: () => {
+                            scene.isBusy = false;
+                        }
                     });
                 }
             });
         }
 
+        // =========================================================
         // 3매치 및 2×2 검사
+        // =========================================================
+
         function checkBoardMatches(scene) {
             const matchedTiles = new Set();
             let has2x2 = false;
+
             for (let row = 0; row < GRID_SIZE; row++) {
                 for (let col = 0; col < GRID_SIZE; col++) {
                     const current = scene.board[row][col];
-                    if (!current) continue;
+
+                    if (!current) {
+                        continue;
+                    }
+
                     if (col <= GRID_SIZE - 3) {
                         const next1 = scene.board[row][col + 1];
                         const next2 = scene.board[row][col + 2];
-                        if (next1 && next2 && current.tileType === next1.tileType && current.tileType === next2.tileType) {
+
+                        if (
+                            next1 &&
+                            next2 &&
+                            current.tileType === next1.tileType &&
+                            current.tileType === next2.tileType
+                        ) {
                             matchedTiles.add(current);
                             matchedTiles.add(next1);
                             matchedTiles.add(next2);
                         }
                     }
+
                     if (row <= GRID_SIZE - 3) {
                         const next1 = scene.board[row + 1][col];
                         const next2 = scene.board[row + 2][col];
-                        if (next1 && next2 && current.tileType === next1.tileType && current.tileType === next2.tileType) {
+
+                        if (
+                            next1 &&
+                            next2 &&
+                            current.tileType === next1.tileType &&
+                            current.tileType === next2.tileType
+                        ) {
                             matchedTiles.add(current);
                             matchedTiles.add(next1);
                             matchedTiles.add(next2);
                         }
                     }
-                    if (row <= GRID_SIZE - 2 && col <= GRID_SIZE - 2) {
+
+                    if (
+                        row <= GRID_SIZE - 2 &&
+                        col <= GRID_SIZE - 2
+                    ) {
                         const topLeft = current;
                         const topRight = scene.board[row][col + 1];
                         const bottomLeft = scene.board[row + 1][col];
-                        const bottomRight = scene.board[row + 1][col + 1];
-                        if (topRight && bottomLeft && bottomRight && topLeft.tileType === topRight.tileType && topLeft.tileType === bottomLeft.tileType && topLeft.tileType === bottomRight.tileType) {
+                        const bottomRight =
+                            scene.board[row + 1][col + 1];
+
+                        if (
+                            topRight &&
+                            bottomLeft &&
+                            bottomRight &&
+                            topLeft.tileType === topRight.tileType &&
+                            topLeft.tileType === bottomLeft.tileType &&
+                            topLeft.tileType === bottomRight.tileType
+                        ) {
                             matchedTiles.add(topLeft);
                             matchedTiles.add(topRight);
                             matchedTiles.add(bottomLeft);
                             matchedTiles.add(bottomRight);
+
                             has2x2 = true;
                         }
                     }
                 }
             }
-            return { matchedTiles: [...matchedTiles], has2x2 };
+
+            return {
+                matchedTiles: [...matchedTiles],
+                has2x2
+            };
         }
 
-        // 연쇄 반응 중 2×2가 한 번이라도 발생하면 퀴즈를 예약합니다.
+        // =========================================================
+        // 연쇄 반응 및 퀴즈 예약
+        // =========================================================
+
         function processMatches(scene, { matchedTiles, has2x2 }) {
             if (!state.isGameActive) {
                 scene.isBusy = false;
                 scene.pendingQuiz = false;
                 return;
             }
-            scene.pendingQuiz = Boolean(scene.pendingQuiz || has2x2);
+
+            scene.pendingQuiz =
+                Boolean(scene.pendingQuiz || has2x2);
+
             applyScoreChange(matchedTiles.length * 20);
+
             scene.tweens.add({
                 targets: matchedTiles,
                 scaleX: 0,
                 scaleY: 0,
                 alpha: 0,
                 duration: 100,
+
                 onComplete: () => {
                     matchedTiles.forEach((tile) => {
                         scene.board[tile.row][tile.col] = null;
                         tile.destroy();
                     });
+
                     dropAndRefill(scene, () => {
                         if (!state.isGameActive) {
                             scene.isBusy = false;
                             scene.pendingQuiz = false;
                             return;
                         }
+
                         const nextMatches = checkBoardMatches(scene);
+
                         if (nextMatches.matchedTiles.length > 0) {
                             processMatches(scene, nextMatches);
                             return;
                         }
+
                         scene.isBusy = false;
-                        const shouldTriggerQuiz = scene.pendingQuiz;
+
+                        const shouldTriggerQuiz =
+                            scene.pendingQuiz;
+
                         scene.pendingQuiz = false;
-                        if (shouldTriggerQuiz) triggerQuizModal();
+
+                        if (shouldTriggerQuiz) {
+                            triggerQuizModal();
+                        }
                     });
                 }
             });
         }
 
+        // =========================================================
         // 낙하 및 새 블록 생성
+        // =========================================================
+
         function dropAndRefill(scene, onComplete) {
             const animations = [];
+
             for (let col = 0; col < GRID_SIZE; col++) {
                 let writeRow = GRID_SIZE - 1;
-                for (let readRow = GRID_SIZE - 1; readRow >= 0; readRow--) {
+
+                for (
+                    let readRow = GRID_SIZE - 1;
+                    readRow >= 0;
+                    readRow--
+                ) {
                     const tile = scene.board[readRow][col];
-                    if (!tile) continue;
+
+                    if (!tile) {
+                        continue;
+                    }
+
                     if (writeRow !== readRow) {
                         scene.board[writeRow][col] = tile;
                         scene.board[readRow][col] = null;
+
                         tile.row = writeRow;
-                        animations.push({ tile, targetY: writeRow * TILE_SIZE, duration: 80 + (writeRow - readRow) * 20 });
+
+                        animations.push({
+                            tile,
+                            targetY: writeRow * TILE_SIZE,
+                            duration:
+                                80 + (writeRow - readRow) * 20
+                        });
                     }
+
                     writeRow--;
                 }
+
                 const emptyCount = writeRow + 1;
+
                 for (let row = 0; row < emptyCount; row++) {
                     const type = randomInt(0, TILE_TYPES - 1);
-                    const startY = (row - emptyCount) * TILE_SIZE;
-                    const tile = createTile(scene, row, col, type, startY);
+                    const startY =
+                        (row - emptyCount) * TILE_SIZE;
+
+                    const tile = createTile(
+                        scene,
+                        row,
+                        col,
+                        type,
+                        startY
+                    );
+
                     scene.board[row][col] = tile;
-                    animations.push({ tile, targetY: row * TILE_SIZE, duration: 120 + emptyCount * 15 });
+
+                    animations.push({
+                        tile,
+                        targetY: row * TILE_SIZE,
+                        duration: 120 + emptyCount * 15
+                    });
                 }
             }
+
             if (animations.length === 0) {
                 onComplete();
                 return;
             }
+
             let remaining = animations.length;
+
             animations.forEach((animation) => {
                 scene.tweens.add({
                     targets: animation.tile,
                     y: animation.targetY,
                     duration: animation.duration,
                     ease: "Quad.easeOut",
+
                     onComplete: () => {
                         remaining--;
-                        if (remaining === 0) onComplete();
+
+                        if (remaining === 0) {
+                            onComplete();
+                        }
                     }
                 });
             });
         }
 
+        // HTML 버튼에서 호출할 함수를 연결합니다.
         Object.assign(window, {
             startAIMatch,
             startMatchmaking,
@@ -1456,6 +2593,7 @@ async function startMatchmaking() {
             restartGame,
             fetchLeaderboard
         });
+
         initializeFirebase();
     </script>
 </body>
