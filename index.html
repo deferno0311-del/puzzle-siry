@@ -471,6 +471,58 @@
                 renderScores();
             }, 3000);
         }
+// =========================================================
+// 직전 매칭 상대 저장 및 조회
+// =========================================================
+
+// 브라우저 저장소를 사용할 수 없는 환경에서는
+// 현재 페이지가 열려 있는 동안만 기억합니다.
+const previousOpponentCache = new Map();
+
+function previousOpponentStorageKey() {
+    return (
+        `quiz_previous_opponent:` +
+        `${state.appId}:${state.userId}`
+    );
+}
+
+function getPreviousOpponentId() {
+    const key = previousOpponentStorageKey();
+
+    try {
+        const savedId = localStorage.getItem(key);
+
+        if (savedId) {
+            return savedId;
+        }
+    } catch (error) {
+        console.warn(
+            "직전 상대 정보를 읽지 못했습니다.",
+            error
+        );
+    }
+
+    return previousOpponentCache.get(key) || null;
+}
+
+function rememberPreviousOpponent(opponentId) {
+    if (!opponentId || opponentId === state.userId) {
+        return;
+    }
+
+    const key = previousOpponentStorageKey();
+
+    previousOpponentCache.set(key, opponentId);
+
+    try {
+        localStorage.setItem(key, opponentId);
+    } catch (error) {
+        console.warn(
+            "직전 상대 정보를 저장하지 못했습니다.",
+            error
+        );
+    }
+}
 
 // =========================================================
 // 여러 팀이 동시에 플레이할 수 있는 온라인 매칭
